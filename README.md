@@ -838,3 +838,17 @@ pnpm typecheck
 ```
 
 ---
+
+## Summary of Created Documentation
+
+| File                       | Description                                                                                                                                                    |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AGENTS.md**              | Agent guide containing project context, architecture, conventions, critical invariants, safe modification workflows, build commands, and common pitfalls.      |
+| **docs/architecture.md**   | System architecture overview, application boundaries, data flow diagrams, multi-tenancy model, and external integration points.                                |
+| **docs/development.md**    | Local environment setup, prerequisites, environment variables for all packages, dev commands, and testing guidelines.                                          |
+| **docs/implementation.md** | Deep dive into core business logic: Contact Sessions, AI Support Agent, RAG indexing & retrieval pipeline, Conversation lifecycle, and Vapi Voice integration. |
+| **docs/api.md**            | Complete Convex API reference covering `public/*`, `private/*`, `system/*` functions, schemas, error codes, and HTTP endpoints.                                |
+| **docs/deployment.md**     | Deployment guides for Vercel (`apps/web`, `apps/widget`), CDN hosting (`apps/embed`), and Convex production backend.                                           |
+| **docs/decisions.md**      | Architectural Decision Records (ADRs) detailing technology choices, trade-offs, and design rationales.                                                         |
+| **CHANGELOG.md**           | Chronological changelog organized by functional modules and components.                                                                                        |
+
