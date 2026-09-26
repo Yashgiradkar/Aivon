@@ -53,6 +53,10 @@ export const WidgetSelectionScreen = () => {
     }
   };
 
+  const hasVoice =
+    Boolean(hasVapiSecrets || process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY) &&
+    Boolean(widgetSettings?.vapiSettings?.assistantId || process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID);
+
   return (
     <>
       <WidgetHeader>
@@ -78,7 +82,7 @@ export const WidgetSelectionScreen = () => {
           </div>
           <ChevronRightIcon />
         </Button>
-        {hasVapiSecrets && widgetSettings?.vapiSettings?.assistantId && (
+        {(hasVoice || hasVapiSecrets || process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY) && (
           <Button
             className="h-16 w-full justify-between"
             variant="outline"

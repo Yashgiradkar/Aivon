@@ -8,11 +8,12 @@ import { useThreadMessages, toUIMessages } from "@convex-dev/agent/react";
 import { WidgetHeader } from "@/modules/widget/ui/components/widget-header";
 import { Button } from "@workspace/ui/components/button";
 import { useAtomValue, useSetAtom } from "jotai";
-import { ArrowLeftIcon, MenuIcon } from "lucide-react";
+import { ArrowLeftIcon, MenuIcon, MicIcon } from "lucide-react";
 import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar";
+import { cn } from "@workspace/ui/lib/utils";
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
-import { contactSessionIdAtomFamily, conversationIdAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "../../atoms/widget-atoms";
+import { contactSessionIdAtomFamily, conversationIdAtom, hasVapiSecretsAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "../../atoms/widget-atoms";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 import { Form, FormField } from "@workspace/ui/components/form";
@@ -46,9 +47,15 @@ export const WidgetChatScreen = () => {
   const widgetSettings = useAtomValue(widgetSettingsAtom);
   const conversationId = useAtomValue(conversationIdAtom);
   const organizationId = useAtomValue(organizationIdAtom);
+  const hasVapiSecrets = useAtomValue(hasVapiSecretsAtom);
   const contactSessionId = useAtomValue(
     contactSessionIdAtomFamily(organizationId || "")
   );
+
+  // Voice is available when Vapi is configured (secrets + assistantId) or env fallbacks exist
+  const hasVoice =
+    Boolean(hasVapiSecrets || process.env.NEXT_PUBLIC_VAPI_PUBLIC_KEY) &&
+    Boolean(widgetSettings?.vapiSettings?.assistantId || process.env.NEXT_PUBLIC_VAPI_ASSISTANT_ID);
 
   const onBack = () => {
     setConversationId(null);
@@ -218,7 +225,22 @@ export const WidgetChatScreen = () => {
               )}
             />
             <AIInputToolbar>
-              <AIInputTools />
+              <AIInputTools>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className={cn(
+                    "h-8 w-8 transition-colors",
+                    hasVoice ? "text-primary hover:bg-primary/10" : "text-muted-foreground hover:text-foreground"
+                  )}
+                  onClick={() => setScreen("voice")}
+                  aria-label="Switch to voice chat"
+                  title="Switch to voice chat"
+                >
+                  <MicIcon className="h-4 w-4" />
+                </Button>
+              </AIInputTools>
               <AIInputSubmit
                 disabled={conversation?.status === "resolved" || !form.formState.isValid}
                 status="ready"

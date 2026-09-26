@@ -63,13 +63,13 @@ export const CustomizationForm = ({
     try {
       const vapiSettings: WidgetSettings["vapiSettings"] = {
         assistantId:
-          values.vapiSettings.assistantId === "none"
+          (values.vapiSettings.assistantId?.trim() === "none"
             ? ""
-            : values.vapiSettings.assistantId,
+            : values.vapiSettings.assistantId?.trim()) || "",
         phoneNumber:
-          values.vapiSettings.phoneNumber === "none"
+          (values.vapiSettings.phoneNumber?.trim() === "none"
             ? ""
-            : values.vapiSettings.phoneNumber,
+            : values.vapiSettings.phoneNumber?.trim()) || "",
       };
 
       await upsertWidgetSettings({

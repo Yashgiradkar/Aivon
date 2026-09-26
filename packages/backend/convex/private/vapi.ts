@@ -61,13 +61,23 @@ export const getAssistants = action({
       });
     }
 
-    const vapiClient = new VapiClient({
-      token: secretData.privateApiKey,
-    });
+    try {
+      const vapiClient = new VapiClient({
+        token: secretData.privateApiKey.trim(),
+      });
 
-    const assistants = await vapiClient.assistants.list();
-
-    return assistants;
+      const assistants = await vapiClient.assistants.list();
+      return assistants;
+    } catch (err) {
+      console.error("[Vapi Backend] Error listing assistants:", err);
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to fetch assistants from Vapi. Please verify your Vapi Private API Key.",
+      });
+    }
   },
 });
 
@@ -128,12 +138,22 @@ export const getPhoneNumbers = action({
       });
     }
 
-    const vapiClient = new VapiClient({
-      token: secretData.privateApiKey,
-    });
+    try {
+      const vapiClient = new VapiClient({
+        token: secretData.privateApiKey.trim(),
+      });
 
-    const phoneNumbers = await vapiClient.phoneNumbers.list();
-
-    return phoneNumbers;
+      const phoneNumbers = await vapiClient.phoneNumbers.list();
+      return phoneNumbers;
+    } catch (err) {
+      console.error("[Vapi Backend] Error listing phone numbers:", err);
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to fetch phone numbers from Vapi. Please verify your Vapi Private API Key.",
+      });
+    }
   },
 });
