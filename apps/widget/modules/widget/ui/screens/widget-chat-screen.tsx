@@ -34,7 +34,8 @@ import { AIResponse } from "@workspace/ui/components/ai/response";
 import { useMemo, useState } from "react";
 import { WidgetQueueBanner } from "../components/widget-queue-banner";
 import { WidgetCallbackDialog } from "../components/widget-callback-dialog";
-import { HeadsetIcon, PhoneForwardedIcon } from "lucide-react";
+import { WidgetCallLogs } from "../components/widget-call-logs";
+import { HeadsetIcon, PhoneForwardedIcon, MessageSquareIcon, AlertCircleIcon } from "lucide-react";
 import { useMutation } from "convex/react";
 
 const formSchema = z.object({
@@ -54,6 +55,8 @@ export const WidgetChatScreen = () => {
   const contactSessionId = useAtomValue(
     contactSessionIdAtomFamily(organizationId || "")
   );
+
+  const maxMessages = widgetSettings?.maxMessagesPerConversation ?? 20;
 
   const joinQueue = useMutation(api.public.queue.join);
 
@@ -112,6 +115,9 @@ export const WidgetChatScreen = () => {
     { initialNumItems: 10 },
   );
 
+  const messageCount = messages.results?.length ?? 0;
+  const isLimitReached = messageCount >= maxMessages;
+
   const { topElementRef, handleLoadMore, canLoadMore, isLoadingMore } = useInfiniteScroll({
     status: messages.status,
     loadMore: messages.loadMore,
@@ -131,13 +137,21 @@ export const WidgetChatScreen = () => {
       return;
     }
 
+    if (isLimitReached) {
+      return;
+    }
+
     form.reset();
 
-    await createMessage({
-      threadId: conversation.threadId,
-      prompt: values.message,
-      contactSessionId,
-    });
+    try {
+      await createMessage({
+        threadId: conversation.threadId,
+        prompt: values.message,
+        contactSessionId,
+      });
+    } catch (err: any) {
+      console.error("Failed to send message:", err);
+    }
   };
 
   return (
@@ -178,6 +192,19 @@ export const WidgetChatScreen = () => {
         </div>
       </WidgetHeader>
       <WidgetQueueBanner />
+      {conversationId && contactSessionId && (
+        <WidgetCallLogs
+          conversationId={conversationId}
+          contactSessionId={contactSessionId}
+        />
+      )}
+      <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-1">
+          <MessageSquareIcon className="size-3 text-primary" />
+          <span>Messages: <strong className="font-semibold text-foreground">{messageCount}</strong> / {maxMessages}</span>
+        </div>
+        <span className="text-[10px] text-muted-foreground/75">Token Saver Mode</span>
+      </div>
       <AIConversation>
         <AIConversationContent>
           <InfiniteScrollTrigger
@@ -231,6 +258,17 @@ export const WidgetChatScreen = () => {
           })}
         </AISuggestions>
       )}
+      {isLimitReached && (
+        <div className="mx-3 my-1.5 flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 p-2.5 text-xs text-amber-600 dark:text-amber-400">
+          <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
+          <div>
+            <p className="font-medium">Message Limit Reached ({maxMessages}/{maxMessages})</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              To keep responses fast and save tokens, please connect with a live human specialist or request a callback above.
+            </p>
+          </div>
+        </div>
+      )}
       <Form {...form}>
           <AIInput
             className="rounded-none border-x-0 border-b-0"
@@ -238,11 +276,11 @@ export const WidgetChatScreen = () => {
           >
             <FormField
               control={form.control}
-              disabled={conversation?.status === "resolved"}
+              disabled={conversation?.status === "resolved" || isLimitReached}
               name="message"
               render={({ field }) => (
                 <AIInputTextarea
-                  disabled={conversation?.status === "resolved"}
+                  disabled={conversation?.status === "resolved" || isLimitReached}
                   onChange={field.onChange}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
@@ -253,6 +291,8 @@ export const WidgetChatScreen = () => {
                   placeholder={
                     conversation?.status === "resolved"
                       ? "This conversation has been resolved."
+                      : isLimitReached
+                      ? `Message limit reached (${maxMessages}/${maxMessages}). Please request human support.`
                       : "Type your message..."
                   }
                   value={field.value}
@@ -277,7 +317,7 @@ export const WidgetChatScreen = () => {
                 </Button>
               </AIInputTools>
               <AIInputSubmit
-                disabled={conversation?.status === "resolved" || !form.formState.isValid}
+                disabled={conversation?.status === "resolved" || isLimitReached || !form.formState.isValid}
                 status="ready"
                 type="submit"
               />

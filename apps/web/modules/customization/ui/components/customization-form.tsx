@@ -47,6 +47,7 @@ export const CustomizationForm = ({
     defaultValues: {
       greetMessage:
         initialData?.greetMessage || "Hi! How can I help you today?",
+      maxMessagesPerConversation: initialData?.maxMessagesPerConversation ?? 20,
       defaultSuggestions: {
         suggestion1: initialData?.defaultSuggestions.suggestion1 || "",
         suggestion2: initialData?.defaultSuggestions.suggestion2 || "",
@@ -74,6 +75,7 @@ export const CustomizationForm = ({
 
       await upsertWidgetSettings({
         greetMessage: values.greetMessage,
+        maxMessagesPerConversation: values.maxMessagesPerConversation ? Number(values.maxMessagesPerConversation) : 20,
         defaultSuggestions: values.defaultSuggestions,
         vapiSettings,
       });
@@ -92,7 +94,7 @@ export const CustomizationForm = ({
           <CardHeader>
             <CardTitle>General Chat Settings</CardTitle>
             <CardDescription>
-              Configure basic chat widget behavior and messages
+              Configure basic chat widget behavior, message limits, and greetings
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -111,6 +113,29 @@ export const CustomizationForm = ({
                   </FormControl>
                   <FormDescription>
                     The first message customers see when they open the chat
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="maxMessagesPerConversation"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Conversation Message Limit (Token Saver)</FormLabel>
+                  <FormControl>
+                    <Input
+                      {...field}
+                      type="number"
+                      min={1}
+                      max={100}
+                      placeholder="e.g. 20"
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Maximum messages allowed per chat conversation to optimize LLM token usage. Default is 20 messages.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

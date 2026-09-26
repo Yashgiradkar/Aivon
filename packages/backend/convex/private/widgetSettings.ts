@@ -4,6 +4,7 @@ import { mutation, query } from "../_generated/server";
 export const upsert = mutation({
   args: {
     greetMessage: v.string(),
+    maxMessagesPerConversation: v.optional(v.number()),
     defaultSuggestions: v.object({
       suggestion1: v.optional(v.string()),
       suggestion2: v.optional(v.string()),
@@ -41,6 +42,7 @@ export const upsert = mutation({
     if (existingWidgetSettings) {
       await ctx.db.patch(existingWidgetSettings._id, {
         greetMessage: args.greetMessage,
+        maxMessagesPerConversation: args.maxMessagesPerConversation,
         defaultSuggestions: args.defaultSuggestions,
         vapiSettings: args.vapiSettings,
       });
@@ -48,6 +50,7 @@ export const upsert = mutation({
       await ctx.db.insert("widgetSettings", {
         organizationId: orgId,
         greetMessage: args.greetMessage,
+        maxMessagesPerConversation: args.maxMessagesPerConversation,
         defaultSuggestions: args.defaultSuggestions,
         vapiSettings: args.vapiSettings,
       });

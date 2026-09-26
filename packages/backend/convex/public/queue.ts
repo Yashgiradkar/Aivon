@@ -360,3 +360,29 @@ export const updateCallStatus = mutation({
     await ctx.db.patch(args.queueEntryId, patch);
   },
 });
+
+// ---------------------------------------------------------------------------
+// Customer: Fetch voice call logs for a specific conversation
+// ---------------------------------------------------------------------------
+export const getCallLogs = query({
+  args: {
+    conversationId: v.id("conversations"),
+    contactSessionId: v.id("contactSessions"),
+  },
+  handler: async (ctx, args) => {
+    const contactSession = await ctx.db.get(args.contactSessionId);
+    if (!contactSession || contactSession.expiresAt < Date.now()) {
+      return [];
+    }
+
+    const calls = await ctx.db
+      .query("supportCalls")
+      .withIndex("by_conversation_id", (q) =>
+        q.eq("conversationId", args.conversationId)
+      )
+      .order("desc")
+      .collect();
+
+    return calls.filter((c) => c.contactSessionId === args.contactSessionId);
+  },
+});

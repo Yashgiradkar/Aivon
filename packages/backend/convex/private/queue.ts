@@ -240,3 +240,33 @@ export const completeQueueEntry = mutation({
     }
   },
 });
+
+// ---------------------------------------------------------------------------
+// Operator: Fetch voice call logs for a specific conversation
+// ---------------------------------------------------------------------------
+export const getCallLogs = query({
+  args: {
+    conversationId: v.id("conversations"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity || !identity.orgId) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Organization not found",
+      });
+    }
+
+    const orgId = identity.orgId as string;
+
+    const calls = await ctx.db
+      .query("supportCalls")
+      .withIndex("by_conversation_id", (q) =>
+        q.eq("conversationId", args.conversationId)
+      )
+      .order("desc")
+      .collect();
+
+    return calls.filter((c) => c.organizationId === orgId);
+  },
+});

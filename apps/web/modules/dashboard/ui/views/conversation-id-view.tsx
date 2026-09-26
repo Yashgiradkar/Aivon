@@ -32,10 +32,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar";
 import { ConversationStatusButton } from "../components/conversation-status-button";
+import { ConversationCallLogs } from "../components/conversation-call-logs";
 import { useState } from "react";
 import { cn } from "@workspace/ui/lib/utils";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { toast } from "sonner";
+import { SparklesIcon, MessageSquareIcon } from "lucide-react";
 
 const formSchema = z.object({
   message: z.string().min(1, "Message is required"),
@@ -50,11 +52,17 @@ export const ConversationIdView = ({
     conversationId,
   });
 
+  const widgetSettings = useQuery(api.private.widgetSettings.getOne);
+  const maxMessages = widgetSettings?.maxMessagesPerConversation ?? 20;
+
   const messages = useThreadMessages(
     api.private.messages.getMany,
     conversation?.threadId ? { threadId: conversation.threadId } : "skip",
     { initialNumItems: 10, }
   );
+
+  const messageCount = messages.results?.length ?? 0;
+  const isLimitReached = messageCount >= maxMessages;
 
   const {
     topElementRef,
@@ -145,12 +153,19 @@ export const ConversationIdView = ({
   return (
     <div className="flex h-full flex-col bg-muted">
       <header className="flex items-center justify-between border-b bg-background p-2.5">
-        <Button
-          size="sm"
-          variant="ghost"
-        >
-          <MoreHorizontalIcon />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+          >
+            <MoreHorizontalIcon />
+          </Button>
+          <div className="flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
+            <MessageSquareIcon className="size-3 text-primary" />
+            <span>Messages: <strong className="font-semibold text-foreground">{messageCount}</strong> / {maxMessages}</span>
+            <span className="hidden sm:inline text-[10px] text-muted-foreground/80">(Token Saver)</span>
+          </div>
+        </div>
         {!!conversation && (
           <ConversationStatusButton
             onClick={handleToggleStatus}
@@ -159,7 +174,10 @@ export const ConversationIdView = ({
           />
         )}
       </header>
-      <AIConversation className="max-h-[calc(100vh-180px)]">
+
+      <ConversationCallLogs conversationId={conversationId} />
+
+      <AIConversation className="max-h-[calc(100vh-220px)]">
         <AIConversationContent>
           <InfiniteScrollTrigger
             canLoadMore={canLoadMore}
@@ -190,6 +208,12 @@ export const ConversationIdView = ({
         <AIConversationScrollButton />
       </AIConversation>
       
+      {isLimitReached && (
+        <div className="mx-2 mb-1 rounded-lg border border-amber-500/20 bg-amber-500/10 p-2 text-xs text-amber-500">
+          <strong>Note:</strong> Conversation token limit of {maxMessages} messages reached.
+        </div>
+      )}
+
       <div className="p-2">
         <Form {...form}>
           <AIInput onSubmit={form.handleSubmit(onSubmit)}>

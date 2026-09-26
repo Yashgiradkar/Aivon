@@ -50,6 +50,35 @@ export const create = action({
       });
     }
 
+    // Check message limit to protect token usage and save AI costs
+    const widgetSettings = await ctx.runQuery(
+      internal.system.widgetSettings.getByOrganizationId,
+      {
+        organizationId: conversation.organizationId,
+      }
+    );
+
+    const maxMessages =
+      widgetSettings?.maxMessagesPerConversation &&
+      widgetSettings.maxMessagesPerConversation > 0
+        ? widgetSettings.maxMessagesPerConversation
+        : 20;
+
+    try {
+      const existingMessages = await supportAgent.listMessages(ctx, {
+        threadId: args.threadId,
+        paginationOpts: { numItems: maxMessages + 1, cursor: null },
+      });
+      if (existingMessages.page.length >= maxMessages) {
+        throw new ConvexError({
+          code: "LIMIT_REACHED",
+          message: `Conversation limit reached (${maxMessages}/${maxMessages} messages). Please request a callback or contact a specialist.`,
+        });
+      }
+    } catch (err) {
+      if (err instanceof ConvexError) throw err;
+    }
+
     // This refreshes the user's session if they are within the threshold
     await ctx.runMutation(internal.system.contactSessions.refresh, {
       contactSessionId: args.contactSessionId,

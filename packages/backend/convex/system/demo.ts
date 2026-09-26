@@ -42,6 +42,7 @@ export const seedDemoOrganization = internalMutation({
         organizationId: args.organizationId,
         greetMessage:
           "👋 Welcome to Aivon Demo! How can our AI and human support specialists assist you today?",
+        maxMessagesPerConversation: 20,
         defaultSuggestions: {
           suggestion1: "How does Aivon's AI support agent work?",
           suggestion2: "Can I talk to a live support specialist?",
@@ -170,9 +171,9 @@ export const seedDemoOrganization = internalMutation({
         status: cust.status,
       });
 
-      // If escalated, add to supportQueue
+      // If escalated, add to supportQueue and add a supportCall record
       if (cust.status === "escalated") {
-        await ctx.db.insert("supportQueue", {
+        const queueEntryId = await ctx.db.insert("supportQueue", {
           organizationId: args.organizationId,
           conversationId: convId,
           contactSessionId: sessionId,
@@ -187,6 +188,52 @@ export const seedDemoOrganization = internalMutation({
           aiSummary:
             "• Customer requested enterprise SLA and European phone routing.\n• AI answered initial questions but human tier-2 confirmation is required.\n• Customer is ready for specialist voice callback.",
           isCallback: false,
+        });
+
+        // Add a demo support call record
+        await ctx.db.insert("supportCalls", {
+          organizationId: args.organizationId,
+          queueEntryId,
+          conversationId: convId,
+          contactSessionId: sessionId,
+          agentId: "operator_demo_1",
+          status: "in_progress",
+          startedAt: Date.now() - 3 * 60 * 1000,
+          connectedAt: Date.now() - 2 * 60 * 1000,
+          durationSeconds: 120,
+          transcriptSummary: "Customer inquired about dedicated enterprise SLA and EU routing. Operator confirmed tier-2 availability and scheduled follow-up.",
+        });
+      } else if (cust.status === "resolved") {
+        // Seed a completed call log for the resolved customer
+        const dummyQueueId = await ctx.db.insert("supportQueue", {
+          organizationId: args.organizationId,
+          conversationId: convId,
+          contactSessionId: sessionId,
+          customerName: cust.name,
+          customerEmail: cust.email,
+          status: "completed",
+          priority: "normal",
+          position: 1,
+          joinedAt: Date.now() - 30 * 60 * 1000,
+          completedAt: Date.now() - 24 * 60 * 1000,
+          estimatedWaitSeconds: 0,
+          lastSeenAt: Date.now() - 24 * 60 * 1000,
+          aiSummary: "Customer requested widget integration assistance.",
+          isCallback: false,
+        });
+
+        await ctx.db.insert("supportCalls", {
+          organizationId: args.organizationId,
+          queueEntryId: dummyQueueId,
+          conversationId: convId,
+          contactSessionId: sessionId,
+          agentId: "operator_demo_1",
+          status: "ended",
+          startedAt: Date.now() - 28 * 60 * 1000,
+          connectedAt: Date.now() - 28 * 60 * 1000,
+          endedAt: Date.now() - 24 * 60 * 1000,
+          durationSeconds: 240,
+          transcriptSummary: "Completed integration walkthrough. User successfully embedded script on Next.js 15 app.",
         });
       }
     }
