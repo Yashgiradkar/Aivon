@@ -65,3 +65,19 @@ export const getOne = internalQuery({
     return await ctx.db.get(args.conversationId);
   },
 });
+
+export const updateLastMessage = internalMutation({
+  args: {
+    conversationId: v.id("conversations"),
+    lastMessageText: v.string(),
+    lastMessageRole: v.string(),
+    lastMessageAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.conversationId, {
+      lastMessageText: args.lastMessageText,
+      lastMessageRole: args.lastMessageRole,
+      lastMessageAt: args.lastMessageAt,
+    });
+  },
+});

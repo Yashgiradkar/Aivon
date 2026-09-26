@@ -1,7 +1,5 @@
 import { mutation, query } from "../_generated/server";
 import { ConvexError, v } from "convex/values";
-import { supportAgent } from "../system/ai/agents/supportAgent";
-import { MessageDoc } from "@convex-dev/agent";
 import { paginationOptsValidator, PaginationResult } from "convex/server";
 import { Doc } from "../_generated/dataModel";
 
@@ -163,28 +161,34 @@ export const getMany = query({
         .paginate(args.paginationOpts)
     }
 
-    const conversationsWithAdditionalData = await Promise.all(
-      conversations.page.map(async (conversation) => {
-        let lastMessage: MessageDoc | null = null;
+    // Batch fetch contact sessions to eliminate redundant DB roundtrips
+    const sessionIds = Array.from(
+      new Set(conversations.page.map((c) => c.contactSessionId))
+    );
+    const sessions = await Promise.all(
+      sessionIds.map((id) => ctx.db.get(id))
+    );
+    const sessionMap = new Map(
+      sessions
+        .filter((s): s is NonNullable<typeof s> => s !== null)
+        .map((s) => [s._id, s])
+    );
 
-        const contactSession = await ctx.db.get(conversation.contactSessionId);
+    // Use denormalized lastMessage fields — zero extra DB calls
+    const conversationsWithAdditionalData = conversations.page
+      .map((conversation) => {
+        const contactSession = sessionMap.get(conversation.contactSessionId);
+        if (!contactSession) return null;
 
-        if (!contactSession) {
-          return null;
-        }
-
-        try {
-          const messages = await supportAgent.listMessages(ctx, {
-            threadId: conversation.threadId,
-            paginationOpts: { numItems: 1, cursor: null },
-          });
-
-          if (messages.page.length > 0) {
-            lastMessage = messages.page[0] ?? null;
-          }
-        } catch {
-          lastMessage = null;
-        }
+        // Shape the denormalized preview into the legacy lastMessage structure
+        // so the ConversationsPanel UI needs zero changes.
+        const lastMessage = conversation.lastMessageText
+          ? {
+              text: conversation.lastMessageText,
+              message: { role: conversation.lastMessageRole ?? "user" },
+              _creationTime: conversation.lastMessageAt ?? conversation._creationTime,
+            }
+          : null;
 
         return {
           ...conversation,
@@ -192,15 +196,11 @@ export const getMany = query({
           contactSession,
         };
       })
-    );
-
-    const validConversations = conversationsWithAdditionalData.filter(
-      (conv): conv is NonNullable<typeof conv> => conv !== null,
-    );
+      .filter((conv): conv is NonNullable<typeof conv> => conv !== null);
 
     return {
       ...conversations,
-      page: validConversations,
+      page: conversationsWithAdditionalData,
     };
   },
 });

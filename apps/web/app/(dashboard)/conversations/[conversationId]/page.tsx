@@ -1,5 +1,8 @@
-import { ConversationIdView } from "@/modules/dashboard/ui/views/conversation-id-view";
+import { Suspense } from "react";
+import { ConversationIdView, ConversationIdViewLoading } from "@/modules/dashboard/ui/views/conversation-id-view";
 import { Id } from "@workspace/backend/_generated/dataModel";
+
+export const dynamic = "force-dynamic";
 
 const Page = async ({
   params,
@@ -10,7 +13,11 @@ const Page = async ({
 }) => {
   const { conversationId } = await params;
 
-  return <ConversationIdView conversationId={conversationId as Id<"conversations">} />
+  return (
+    <Suspense fallback={<ConversationIdViewLoading />}>
+      <ConversationIdView conversationId={conversationId as Id<"conversations">} />
+    </Suspense>
+  );
 };
  
 export default Page;

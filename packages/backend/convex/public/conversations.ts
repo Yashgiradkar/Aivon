@@ -2,7 +2,7 @@ import { mutation, query } from "../_generated/server";
 import { components, internal } from "../_generated/api";
 import { ConvexError, v } from "convex/values";
 import { supportAgent } from "../system/ai/agents/supportAgent";
-import { MessageDoc, saveMessage } from "@convex-dev/agent";
+import { saveMessage } from "@convex-dev/agent";
 import { paginationOptsValidator } from "convex/server";
 
 export const getMany = query({
@@ -28,33 +28,25 @@ export const getMany = query({
       .order("desc")
       .paginate(args.paginationOpts);
 
-    const conversationsWithLastMessage = await Promise.all(
-      conversations.page.map(async (conversation) => {
-        let lastMessage: MessageDoc | null = null;
-
-        try {
-          const messages = await supportAgent.listMessages(ctx, {
-            threadId: conversation.threadId,
-            paginationOpts: { numItems: 1, cursor: null },
-          });
-
-          if (messages.page.length > 0) {
-            lastMessage = messages.page[0] ?? null;
+    // Use denormalized lastMessage fields — zero extra DB calls
+    const conversationsWithLastMessage = conversations.page.map((conversation) => {
+      const lastMessage = conversation.lastMessageText
+        ? {
+            text: conversation.lastMessageText,
+            message: { role: conversation.lastMessageRole ?? "user" },
+            _creationTime: conversation.lastMessageAt ?? conversation._creationTime,
           }
-        } catch {
-          lastMessage = null;
-        }
+        : null;
 
-        return {
-          _id: conversation._id,
-          _creationTime: conversation._creationTime,
-          status: conversation.status,
-          organizationId: conversation.organizationId,
-          threadId: conversation.threadId,
-          lastMessage,
-        };
-      })
-    );
+      return {
+        _id: conversation._id,
+        _creationTime: conversation._creationTime,
+        status: conversation.status,
+        organizationId: conversation.organizationId,
+        threadId: conversation.threadId,
+        lastMessage,
+      };
+    });
 
     return {
       ...conversations,
@@ -133,11 +125,13 @@ export const create = mutation({
       userId: args.organizationId,
     });
 
+    const greetMessage = widgetSettings?.greetMessage || "Hello, how can I help you today?";
+
     await saveMessage(ctx, components.agent, {
       threadId,
       message: {
         role: "assistant",
-        content: widgetSettings?.greetMessage || "Hello, how can I help you today?",
+        content: greetMessage,
       },
     });
 
@@ -146,6 +140,10 @@ export const create = mutation({
       status: "unresolved",
       organizationId: args.organizationId,
       threadId,
+      // Denormalize the greeting as initial lastMessage preview
+      lastMessageText: greetMessage,
+      lastMessageRole: "assistant",
+      lastMessageAt: Date.now(),
     });
 
     return conversationId;

@@ -3,6 +3,21 @@ import { withSentryConfig } from "@sentry/nextjs";
 const nextConfig = {
   transpilePackages: ["@workspace/ui"],
   devIndicators: false,
+  compress: true,
+  poweredByHeader: false,
+  reactStrictMode: true,
+  // Prevent heavy server-side packages from being bundled into edge runtime
+  serverExternalPackages: ["bowser"],
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "@workspace/ui",
+      "date-fns",
+      "jotai",
+      "@convex-dev/agent",
+      "@convex-dev/rag",
+    ],
+  },
   async redirects() {
     return [
       {
@@ -10,9 +25,36 @@ const nextConfig = {
         destination: "/conversations",
         permanent: false,
       },
-    ]
-  }
-}
+    ];
+  },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "X-DNS-Prefetch-Control",
+            value: "on",
+          },
+          {
+            // Allow browsers to prefetch linked pages
+            key: "Link",
+            value: "<https://clerk.aivon.io>; rel=preconnect",
+          },
+        ],
+      },
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+    ];
+  },
+};
 
 export default withSentryConfig(nextConfig, {
   // For all available options, see:

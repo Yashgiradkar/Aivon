@@ -38,6 +38,10 @@ export default defineSchema({
       v.literal("escalated"),
       v.literal("resolved")
     ),
+    // Denormalized last-message preview — eliminates N+1 listMessages calls on list views
+    lastMessageText: v.optional(v.string()),
+    lastMessageRole: v.optional(v.string()),
+    lastMessageAt: v.optional(v.number()),
   })
     .index("by_organization_id", ["organizationId"])
     .index("by_contact_session_id", ["contactSessionId"])

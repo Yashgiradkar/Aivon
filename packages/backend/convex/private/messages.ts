@@ -125,6 +125,13 @@ export const create = mutation({
         content: args.prompt,
       },
     });
+
+    // Denormalize last message preview onto conversation for fast list rendering
+    await ctx.db.patch(args.conversationId, {
+      lastMessageText: args.prompt,
+      lastMessageRole: "assistant",
+      lastMessageAt: Date.now(),
+    });
   },
 });
 

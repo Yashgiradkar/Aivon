@@ -118,6 +118,7 @@ export const ConversationsPanel = () => {
               return (
                 <Link
                   key={conversation._id}
+                  prefetch={true}
                   className={cn(
                     "relative flex cursor-pointer items-start gap-3 border-b p-4 py-5 text-sm leading-tight hover:bg-accent hover:text-accent-foreground",
                     pathname === `/conversations/${conversation._id}` &&
@@ -143,7 +144,9 @@ export const ConversationsPanel = () => {
                         {conversation.contactSession.name}
                       </span>
                       <span className="ml-auto shrink-0 text-muted-foreground text-xs">
-                        {formatDistanceToNow(conversation._creationTime)}
+                        {formatDistanceToNow(
+                          conversation.lastMessage?._creationTime ?? conversation._creationTime
+                        )}
                       </span>
                     </div>
                     <div className="mt-1 flex items-center justify-between gap-2">

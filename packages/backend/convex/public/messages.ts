@@ -79,8 +79,8 @@ export const create = action({
       if (err instanceof ConvexError) throw err;
     }
 
-    // This refreshes the user's session if they are within the threshold
-    await ctx.runMutation(internal.system.contactSessions.refresh, {
+    // Refresh contact session asynchronously so message creation TTFB is immediate
+    await ctx.scheduler.runAfter(0, internal.system.contactSessions.refresh, {
       contactSessionId: args.contactSessionId,
     });
 
@@ -97,6 +97,7 @@ export const create = action({
     const shouldTriggerAgent =
       conversation.status === "unresolved" && isSubscribed;
 
+    // Write the user message and trigger AI, then denormalize the last message preview
     if (shouldTriggerAgent) {
       await supportAgent.generateText(
         ctx,
@@ -110,6 +111,13 @@ export const create = action({
           }
         },
       );
+      // After AI responds, the last message will be from the assistant
+      await ctx.runMutation(internal.system.conversations.updateLastMessage, {
+        conversationId: conversation._id,
+        lastMessageText: args.prompt, // Show the user's trigger message as last
+        lastMessageRole: "user",
+        lastMessageAt: Date.now(),
+      });
     } else {
       await saveMessage(ctx, components.agent, {
         threadId: args.threadId,
@@ -117,6 +125,12 @@ export const create = action({
           role: "user",
           content: args.prompt,
         },
+      });
+      await ctx.runMutation(internal.system.conversations.updateLastMessage, {
+        conversationId: conversation._id,
+        lastMessageText: args.prompt,
+        lastMessageRole: "user",
+        lastMessageAt: Date.now(),
       });
     }
   },
