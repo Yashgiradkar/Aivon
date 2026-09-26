@@ -89,9 +89,13 @@ const VapiPluginForm = ({
       });
       setOpen(false);
       toast.success("Vapi secret created");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Something went wrong");
+      const msg =
+        error?.data?.message ||
+        error?.message ||
+        "Failed to save Vapi credentials";
+      toast.error(msg);
     }
   };
 
@@ -175,9 +179,13 @@ const VapiPluginRemoveForm = ({
       });
       setOpen(false);
       toast.success("Vapi plugin removed");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Something went wrong");
+      const msg =
+        error?.data?.message ||
+        error?.message ||
+        "Failed to remove Vapi plugin";
+      toast.error(msg);
     }
   };
 
@@ -202,11 +210,16 @@ const VapiPluginRemoveForm = ({
 
 export const VapiView = () => {
   const vapiPlugin = useQuery(api.private.plugins.getOne, { service: "vapi" });
+  const isDemo = useQuery(api.private.demo.isDemoOrganization);
 
   const [connectOpen, setConnectOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
 
   const toggleConnection = () => {
+    if (isDemo) {
+      toast.info("Demo Mode: Voice integration is pre-configured with simulated credentials.");
+      return;
+    }
     if (vapiPlugin) {
       setRemoveOpen(true);
     } else {
@@ -221,12 +234,21 @@ export const VapiView = () => {
       <div className="flex min-h-screen flex-col bg-muted p-8">
         <div className="mx-auto w-full max-w-screen-md">
           <div className="space-y-2">
-            <h1 className="text-2xl md:text-4xl">Vapi Plugin</h1>
-            <p className="text-muted-foreground">Connect Vapi to enable AI voice calls and phone support</p>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl md:text-4xl font-semibold">Vapi Plugin</h1>
+              {isDemo && (
+                <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-3 py-0.5 text-xs font-medium text-emerald-400">
+                  Demo Voice Active
+                </span>
+              )}
+            </div>
+            <p className="text-muted-foreground">
+              Connect Vapi to enable AI voice calls and phone support
+            </p>
           </div>
 
           <div className="mt-8">
-            {vapiPlugin ? (
+            {vapiPlugin || isDemo ? (
               <VapiConnectedView onDisconnect={toggleConnection} />
             ) : (
               <PluginCard

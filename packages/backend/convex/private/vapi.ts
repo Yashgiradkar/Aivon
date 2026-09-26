@@ -25,6 +25,29 @@ export const getAssistants = action({
       });
     }
 
+    const isDemo =
+      identity.email?.toLowerCase().includes("demo") ||
+      orgId.toLowerCase().includes("demo");
+
+    if (isDemo) {
+      return [
+        {
+          id: "demo-vapi-asst-1",
+          orgId: orgId,
+          name: "Aivon AI Voice Specialist (Demo)",
+          model: {
+            provider: "openai",
+            model: "gpt-4o-mini",
+            messages: [],
+          },
+          firstMessage:
+            "👋 Hi! Thanks for calling Aivon AI Customer Support Demo. How can I assist you today?",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as unknown as Vapi.Assistant,
+      ];
+    }
+
     const plugin = await ctx.runQuery(
       internal.system.plugins.getByOrganizationIdAndService,
       {
@@ -100,6 +123,23 @@ export const getPhoneNumbers = action({
         code: "UNAUTHORIZED",
         message: "Organization not found",
       });
+    }
+
+    const isDemo =
+      identity.email?.toLowerCase().includes("demo") ||
+      orgId.toLowerCase().includes("demo");
+
+    if (isDemo) {
+      return [
+        {
+          id: "demo-phone-1",
+          orgId: orgId,
+          number: "+1 (800) 555-AIVON",
+          name: "Aivon Demo Inbound Support Line",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as unknown as Vapi.PhoneNumbersListResponseItem,
+      ];
     }
 
     const plugin = await ctx.runQuery(

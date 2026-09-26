@@ -32,12 +32,14 @@ export const escalateConversation = createTool({
 
       if (contactSession) {
         // Enqueue customer into supportQueue
-        const queueEntryId = await ctx.runMutation(
-          internal.system.queue.matchAndAssign,
-          {
-            organizationId: conversation.organizationId,
-          }
-        );
+        await ctx.runMutation(internal.system.queue.enqueue, {
+          organizationId: conversation.organizationId,
+          conversationId: conversation._id,
+          contactSessionId: conversation.contactSessionId,
+          customerName: contactSession.name,
+          customerEmail: contactSession.email,
+          priority: "high",
+        });
       }
     }
 

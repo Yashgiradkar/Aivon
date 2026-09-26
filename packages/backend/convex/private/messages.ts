@@ -171,11 +171,19 @@ export const getMany = query({
       });
     }
 
-    const paginated = await supportAgent.listMessages(ctx, {
-      threadId: args.threadId,
-      paginationOpts: args.paginationOpts,
-    });
+    try {
+      const paginated = await supportAgent.listMessages(ctx, {
+        threadId: args.threadId,
+        paginationOpts: args.paginationOpts,
+      });
 
-    return paginated;
+      return paginated;
+    } catch {
+      return {
+        page: [],
+        isDone: true,
+        continueCursor: "",
+      };
+    }
   },
 });

@@ -15,6 +15,7 @@ import type * as lib_secrets from "../lib/secrets.js";
 import type * as playground from "../playground.js";
 import type * as private_contactSessions from "../private/contactSessions.js";
 import type * as private_conversations from "../private/conversations.js";
+import type * as private_demo from "../private/demo.js";
 import type * as private_files from "../private/files.js";
 import type * as private_messages from "../private/messages.js";
 import type * as private_plugins from "../private/plugins.js";
@@ -37,6 +38,7 @@ import type * as system_ai_tools_resolveConversation from "../system/ai/tools/re
 import type * as system_ai_tools_search from "../system/ai/tools/search.js";
 import type * as system_contactSessions from "../system/contactSessions.js";
 import type * as system_conversations from "../system/conversations.js";
+import type * as system_demo from "../system/demo.js";
 import type * as system_plugins from "../system/plugins.js";
 import type * as system_queue from "../system/queue.js";
 import type * as system_secrets from "../system/secrets.js";
@@ -65,6 +67,7 @@ declare const fullApi: ApiFromModules<{
   playground: typeof playground;
   "private/contactSessions": typeof private_contactSessions;
   "private/conversations": typeof private_conversations;
+  "private/demo": typeof private_demo;
   "private/files": typeof private_files;
   "private/messages": typeof private_messages;
   "private/plugins": typeof private_plugins;
@@ -87,6 +90,7 @@ declare const fullApi: ApiFromModules<{
   "system/ai/tools/search": typeof system_ai_tools_search;
   "system/contactSessions": typeof system_contactSessions;
   "system/conversations": typeof system_conversations;
+  "system/demo": typeof system_demo;
   "system/plugins": typeof system_plugins;
   "system/queue": typeof system_queue;
   "system/secrets": typeof system_secrets;

@@ -26,7 +26,13 @@ export const upsert = mutation({
       });
     }
 
-    // TODO: Check for subscription
+    // Demo organization protection
+    if (identity.email?.toLowerCase().includes("demo") || orgId.toLowerCase().includes("demo")) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Modifying production API secrets is disabled in Demo Mode.",
+      });
+    }
 
     await ctx.scheduler.runAfter(0, internal.system.secrets.upsert, {
       service: args.service,

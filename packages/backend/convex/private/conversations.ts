@@ -173,13 +173,17 @@ export const getMany = query({
           return null;
         }
 
-        const messages = await supportAgent.listMessages(ctx, {
-          threadId: conversation.threadId,
-          paginationOpts: { numItems: 1, cursor: null },
-        });
+        try {
+          const messages = await supportAgent.listMessages(ctx, {
+            threadId: conversation.threadId,
+            paginationOpts: { numItems: 1, cursor: null },
+          });
 
-        if (messages.page.length > 0) {
-          lastMessage = messages.page[0] ?? null;
+          if (messages.page.length > 0) {
+            lastMessage = messages.page[0] ?? null;
+          }
+        } catch {
+          lastMessage = null;
         }
 
         return {

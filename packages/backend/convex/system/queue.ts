@@ -7,6 +7,83 @@ import { openai } from "@ai-sdk/openai";
 const AVG_CALL_DURATION_SECONDS = 180; // 3 minutes per call estimate
 
 // ---------------------------------------------------------------------------
+// Enqueue customer into support queue (invoked by AI escalation or widget)
+// ---------------------------------------------------------------------------
+export const enqueue = internalMutation({
+  args: {
+    conversationId: v.id("conversations"),
+    contactSessionId: v.id("contactSessions"),
+    organizationId: v.string(),
+    customerName: v.string(),
+    customerEmail: v.string(),
+    priority: v.optional(
+      v.union(v.literal("normal"), v.literal("high"), v.literal("urgent"))
+    ),
+  },
+  handler: async (ctx, args) => {
+    // Check if active queue entry already exists
+    const existing = await ctx.db
+      .query("supportQueue")
+      .withIndex("by_conversation_id", (q) =>
+        q.eq("conversationId", args.conversationId)
+      )
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("status"), "waiting"),
+          q.eq(q.field("status"), "offered"),
+          q.eq(q.field("status"), "accepted"),
+          q.eq(q.field("status"), "connecting"),
+          q.eq(q.field("status"), "connected")
+        )
+      )
+      .first();
+
+    if (existing) {
+      return existing._id;
+    }
+
+    // Count existing waiting entries
+    const waitingEntries = await ctx.db
+      .query("supportQueue")
+      .withIndex("by_organization_id_and_status", (q) =>
+        q.eq("organizationId", args.organizationId).eq("status", "waiting")
+      )
+      .collect();
+
+    const position = waitingEntries.length + 1;
+    const estimatedWaitSeconds = position * AVG_CALL_DURATION_SECONDS;
+
+    const queueEntryId = await ctx.db.insert("supportQueue", {
+      organizationId: args.organizationId,
+      conversationId: args.conversationId,
+      contactSessionId: args.contactSessionId,
+      customerName: args.customerName,
+      customerEmail: args.customerEmail,
+      status: "waiting",
+      priority: args.priority || "high",
+      position,
+      joinedAt: Date.now(),
+      estimatedWaitSeconds,
+      lastSeenAt: Date.now(),
+      isCallback: false,
+    });
+
+    // Generate AI summary for human agent
+    await ctx.scheduler.runAfter(0, internal.system.queue.generateSummary, {
+      queueEntryId,
+      conversationId: args.conversationId,
+    });
+
+    // Trigger matcher
+    await ctx.scheduler.runAfter(0, internal.system.queue.matchAndAssign, {
+      organizationId: args.organizationId,
+    });
+
+    return queueEntryId;
+  },
+});
+
+// ---------------------------------------------------------------------------
 // Match next eligible customer to an available agent (FIFO + Priority)
 // ---------------------------------------------------------------------------
 export const matchAndAssign = internalMutation({

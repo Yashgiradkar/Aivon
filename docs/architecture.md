@@ -158,7 +158,9 @@ flowchart TD
 | Layer | Mechanism | Where enforced |
 |-------|-----------|---------------|
 | Dashboard auth | Clerk JWT (via `@clerk/nextjs`) | `apps/web/middleware.ts` |
+| Recruiter Demo auth | Server-generated Clerk sign-in ticket (single-use) | `apps/web/app/api/auth/demo/route.ts` |
 | Dashboard org enforcement | `identity.orgId` check in every `private/` handler | `convex/private/*.ts` |
+| Demo data isolation | Scoped to Demo Org + read-only secret protection | `convex/private/demo.ts`, `convex/private/secrets.ts` |
 | Widget session auth | `contactSessionId` + expiry check | `convex/public/*.ts` |
 | Convex ↔ Clerk trust | JWT issued by Clerk domain, verified by Convex | `convex/auth.config.ts` |
 | Webhook verification | Svix signature validation | `convex/http.ts` |

@@ -24,6 +24,13 @@ export const remove = mutation({
       });
     }
 
+    if (identity.email?.toLowerCase().includes("demo") || orgId.toLowerCase().includes("demo")) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Disconnecting plugins is disabled in Demo Mode.",
+      });
+    }
+
     const existingPlugin = await ctx.db
       .query("plugins")
       .withIndex("by_organization_id_and_service", (q) =>

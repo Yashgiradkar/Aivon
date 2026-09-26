@@ -62,8 +62,11 @@ export const create = action({
       },
     );
 
+    const isDemo = conversation.organizationId.toLowerCase().includes("demo");
+    const isSubscribed = subscription?.status === "active" || isDemo;
+
     const shouldTriggerAgent =
-      conversation.status === "unresolved" && subscription?.status === "active"
+      conversation.status === "unresolved" && isSubscribed;
 
     if (shouldTriggerAgent) {
       await supportAgent.generateText(
@@ -77,11 +80,14 @@ export const create = action({
             searchTool: search,
           }
         },
-      )
+      );
     } else {
       await saveMessage(ctx, components.agent, {
         threadId: args.threadId,
-        prompt: args.prompt,
+        message: {
+          role: "user",
+          content: args.prompt,
+        },
       });
     }
   },
@@ -103,11 +109,19 @@ export const getMany = query({
       });
     }
 
-    const paginated = await supportAgent.listMessages(ctx, {
-      threadId: args.threadId,
-      paginationOpts: args.paginationOpts,
-    });
+    try {
+      const paginated = await supportAgent.listMessages(ctx, {
+        threadId: args.threadId,
+        paginationOpts: args.paginationOpts,
+      });
 
-    return paginated;
+      return paginated;
+    } catch {
+      return {
+        page: [],
+        isDone: true,
+        continueCursor: "",
+      };
+    }
   },
 });
