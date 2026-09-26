@@ -165,6 +165,35 @@ flowchart TD
 
 ---
 
+### Human Support Queue & Voice Callback Flow
+
+```mermaid
+sequenceDiagram
+    participant WG as Widget (Customer)
+    participant PB as public/queue (Convex)
+    participant SY as system/queue (Convex)
+    participant DA as Dashboard (Operator)
+    participant VP as Vapi WebRTC
+
+    WG->>PB: public.queue.join(conversationId, contactSessionId)
+    PB->>SY: generateSummary(conversationId)
+    PB->>SY: matchAndAssign(organizationId)
+    alt Agent available immediately
+        SY->>DA: Assign to Operator (status=accepted)
+        SY-->>WG: Agent assigned!
+        WG->>VP: Connect Vapi WebRTC Call
+    else No agent available
+        SY-->>WG: Queued (position=1, estWait=3min)
+        WG->>WG: Continue AI Chat while waiting
+        DA->>DA: Operator sets status=available
+        DA->>SY: matchAndAssign(organizationId)
+        SY-->>WG: Agent assigned! (via Convex real-time sub)
+        WG->>VP: Connect Vapi WebRTC Call
+    end
+```
+
+---
+
 ## Database / Storage Architecture
 
 ### Tables (defined in `convex/schema.ts`)
@@ -176,6 +205,9 @@ flowchart TD
 | `plugins` | `organizationId`, `service`, `secretName` | `by_organization_id`, `by_organization_id_and_service` |
 | `conversations` | `threadId`, `organizationId`, `contactSessionId`, `status` | `by_organization_id`, `by_contact_session_id`, `by_thread_id`, `by_status_and_organization_id` |
 | `contactSessions` | `name`, `email`, `organizationId`, `expiresAt`, `metadata` | `by_organization_id`, `by_expires_at` |
+| `supportQueue` | `organizationId`, `conversationId`, `contactSessionId`, `status`, `priority`, `position`, `assignedAgentId`, `aiSummary`, `isCallback` | `by_organization_id`, `by_organization_id_and_status`, `by_contact_session_id`, `by_conversation_id`, `by_assigned_agent` |
+| `supportAgentAvailability` | `organizationId`, `agentId`, `agentName`, `status`, `currentConversationId`, `currentQueueEntryId` | `by_organization_id`, `by_organization_id_and_status`, `by_agent_id` |
+| `supportCalls` | `organizationId`, `queueEntryId`, `conversationId`, `contactSessionId`, `agentId`, `status`, `startedAt`, `durationSeconds` | `by_organization_id`, `by_queue_entry_id`, `by_conversation_id` |
 | `users` | `name` | (none — dev/test stub) |
 
 **Agent/RAG tables** are managed by `@convex-dev/agent` and `@convex-dev/rag` components — they exist in the Convex instance but are not in `schema.ts`.
@@ -233,3 +265,121 @@ Convex has no traditional background job queue. Async work is handled via:
 | `next` | ^15 | React framework |
 | `jotai` | ^2 | Client-side state management |
 | `turbo` | ^2 | Monorepo build orchestration |
+
+
+
+### Architectural for Queueing of Calls
+
+```
+                       CUSTOMER CHAT
+                             │
+                             ▼
+                    apps/widget (:3001)
+                             │
+                             ▼
+                      contactSessions
+                             │
+                             ▼
+                       conversations
+                             │
+                             ▼
+                         messages
+                             │
+                             ▼
+                        supportAgent
+                             │
+               ┌─────────────┴─────────────┐
+               ▼                           ▼
+          RAG / Search           Escalation / Human Needed
+               │                           │
+               │                           ▼
+               │                     supportQueue (FIFO + Priority)
+               │                           │
+               │                     system/queue.ts
+               │                     (Atomic Agent Matcher)
+               │                           │
+               │                           ▼
+               │                     Agent Reserved
+               │                           │
+               │                           ▼
+               │                 Vapi WebRTC Voice Bridge
+               │                           │
+               │                           ▼
+               │                    Operator Dashboard
+               │                    apps/web (:3000/queue)
+               │                           │
+               └───────────────────────────┴─────► Zero-Explanation Context
+```
+
+
+
+## 3. Exact Integration Points
+
+```mermaid
+flowchart TD
+    A[Customer In Chat / Escalation Tool] --> B{Agent Available?}
+    B -->|Yes| C[Atomically Reserve Agent & Customer]
+    B -->|No| D[Insert into supportQueue: status='waiting']
+    D --> E[Customer Continues AI Chat with Live Queue Position]
+    E --> F[Agent Changes Presence to 'available' / Frees Up]
+    F --> G[Queue Matcher: Atomically Assign FIFO + Priority]
+    G --> C
+    C --> H[Generate AI Conversation Summary]
+    H --> I[Trigger Vapi Call / Bridge to Specialist]
+    I --> J[Live Voice Support]
+    J --> K[Call Ended -> Persist Transcript -> Complete Queue Entry]
+```
+
+
+## 6. Queue State Machine
+
+```
+               ┌───────────────┐
+               │    waiting    │ ◄─── (Customer joins queue / continues chat)
+               └───────┬───────┘
+                       │
+         ┌─────────────┴─────────────┐
+         ▼                           ▼
+┌────────────────┐          ┌────────────────┐
+│   cancelled    │          │    expired     │
+└────────────────┘          └────────────────┘
+         │
+         ▼ (Agent match found)
+┌────────────────┐
+│    offered     │ ──── (Timeout / Reject) ───► [waiting] (Re-queued with original joinedAt)
+└────────┬───────┘
+         │ (Agent Accepts)
+         ▼
+┌────────────────┐
+│    accepted    │
+└────────┬───────┘
+         │
+         ▼
+┌────────────────┐
+│   connecting   │ ──── (Vapi WebRTC fails) ──► [failed] ──► [retry -> waiting]
+└────────┬───────┘
+         │
+         ▼
+┌────────────────┐
+│   connected    │
+└────────┬───────┘
+         │ (Call Ends)
+         ▼
+┌────────────────┐
+│   completed    │
+└────────────────┘
+```
+
+---
+
+## 7. Agent Assignment Algorithm (FIFO + Priority Atomic Reservation)
+
+1. **Ordering Rule:** Order active queue entries by `priority` (`urgent` = 3, `high` = 2, `normal` = 1) descending, then `joinedAt` ascending (strict FIFO within priority tier).
+2. **Atomic Reservation:**
+   - Execute in a single Convex mutation transaction.
+   - Query first available agent for `organizationId` with `status === "available"`.
+   - Update `supportAgentAvailability.status` to `"busy"` / `"on_call"` with `currentQueueEntryId`.
+   - Update `supportQueue.status` to `"offered"` (or `"accepted"`), assigning `assignedAgentId`.
+   - Convex guarantees serializable ACID mutation execution — preventing two customers from reserving the same agent or two agents from picking the same customer.
+
+---

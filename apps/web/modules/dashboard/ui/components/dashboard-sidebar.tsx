@@ -3,6 +3,7 @@
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
 import {
   CreditCardIcon,
+  HeadsetIcon,
   InboxIcon,
   LayoutDashboardIcon,
   LibraryBigIcon,
@@ -32,6 +33,11 @@ const customerSupportItems = [
     title: "Conversations",
     url: "/conversations",
     icon: InboxIcon,
+  },
+  {
+    title: "Support Queue",
+    url: "/queue",
+    icon: HeadsetIcon,
   },
   {
     title: "Knowledge Base",

@@ -56,3 +56,12 @@ export const getByThreadId = internalQuery({
     return conversation;
   },
 });
+
+export const getOne = internalQuery({
+  args: {
+    conversationId: v.id("conversations"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.conversationId);
+  },
+});

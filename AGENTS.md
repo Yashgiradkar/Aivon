@@ -38,11 +38,13 @@ convex/
 │   ├── contactSessions.ts   # Session create/validate
 │   ├── conversations.ts     # Widget conversation list/get/create
 │   ├── messages.ts          # Widget message create/list + AI trigger
+│   ├── queue.ts             # Customer queue join, status, leave, callback scheduling
 │   ├── widgetSettings.ts    # Fetch org widget settings
 │   └── secrets.ts           # Fetch public Vapi keys for widget
 ├── private/            # Clerk-authenticated functions (dashboard-facing)
 │   ├── conversations.ts     # Dashboard conversation list/get/status-update
 │   ├── messages.ts          # Dashboard message create, AI enhancement
+│   ├── queue.ts             # Operator queue list, agent presence, call completion
 │   ├── widgetSettings.ts    # Upsert widget settings
 │   ├── files.ts             # Knowledge base file upload/list/delete (RAG)
 │   ├── plugins.ts           # Plugin registry (Vapi)
@@ -53,10 +55,11 @@ convex/
 │   │   ├── agents/supportAgent.ts   # GPT-4o-mini agent definition
 │   │   ├── tools/
 │   │   │   ├── search.ts            # RAG vector search tool
-│   │   │   ├── escalateConversation.ts
+│   │   │   ├── escalateConversation.ts # Escalates conversation & enqueues for human
 │   │   │   └── resolveConversation.ts
 │   │   ├── constants.ts             # All LLM system prompts
 │   │   └── rag.ts                   # RAG instance (text-embedding-3-small, dim=1536)
+│   ├── queue.ts                     # Atomic FIFO matcher, position calculation & AI summaries
 │   ├── contactSessions.ts           # Session refresh (internal)
 │   ├── conversations.ts             # Escalate/resolve mutations (internal)
 │   ├── plugins.ts                   # Plugin upsert/get (internal)

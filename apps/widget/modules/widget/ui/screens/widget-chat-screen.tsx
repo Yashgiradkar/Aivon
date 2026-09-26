@@ -29,12 +29,13 @@ import {
   AIInputToolbar,
   AIInputTools,
 } from "@workspace/ui/components/ai/input";
-import {
-  AIMessage,
-  AIMessageContent,
-} from "@workspace/ui/components/ai/message";
+import { AIMessage, AIMessageContent } from "@workspace/ui/components/ai/message";
 import { AIResponse } from "@workspace/ui/components/ai/response";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { WidgetQueueBanner } from "../components/widget-queue-banner";
+import { WidgetCallbackDialog } from "../components/widget-callback-dialog";
+import { HeadsetIcon, PhoneForwardedIcon } from "lucide-react";
+import { useMutation } from "convex/react";
 
 const formSchema = z.object({
   message: z.string().min(1, "Message is required"),
@@ -44,6 +45,8 @@ export const WidgetChatScreen = () => {
   const setScreen = useSetAtom(screenAtom);
   const setConversationId = useSetAtom(conversationIdAtom);
 
+  const [callbackOpen, setCallbackOpen] = useState(false);
+
   const widgetSettings = useAtomValue(widgetSettingsAtom);
   const conversationId = useAtomValue(conversationIdAtom);
   const organizationId = useAtomValue(organizationIdAtom);
@@ -51,6 +54,20 @@ export const WidgetChatScreen = () => {
   const contactSessionId = useAtomValue(
     contactSessionIdAtomFamily(organizationId || "")
   );
+
+  const joinQueue = useMutation(api.public.queue.join);
+
+  const handleRequestHuman = async () => {
+    if (!conversationId || !contactSessionId) return;
+    try {
+      await joinQueue({
+        conversationId,
+        contactSessionId,
+      });
+    } catch (err) {
+      console.error("Failed to join queue:", err);
+    }
+  };
 
   // Voice is available when Vapi is configured (secrets + assistantId) or env fallbacks exist
   const hasVoice =
@@ -125,6 +142,7 @@ export const WidgetChatScreen = () => {
 
   return (
     <>
+      <WidgetCallbackDialog open={callbackOpen} onOpenChange={setCallbackOpen} />
       <WidgetHeader className="flex items-center justify-between">
         <div className="flex items-center gap-x-2">
           <Button
@@ -134,15 +152,32 @@ export const WidgetChatScreen = () => {
           >
             <ArrowLeftIcon />
           </Button>
-          <p>Chat</p>
+          <p className="font-medium">Chat</p>
         </div>
-        <Button
-          size="icon"
-          variant="transparent"
-        >
-          <MenuIcon />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 gap-1 px-2 text-xs"
+            onClick={handleRequestHuman}
+            title="Request a human specialist"
+          >
+            <HeadsetIcon className="h-3.5 w-3.5 text-primary" />
+            <span className="hidden sm:inline">Human</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 gap-1 px-2 text-xs"
+            onClick={() => setCallbackOpen(true)}
+            title="Request a callback"
+          >
+            <PhoneForwardedIcon className="h-3.5 w-3.5 text-primary" />
+            <span className="hidden sm:inline">Callback</span>
+          </Button>
+        </div>
       </WidgetHeader>
+      <WidgetQueueBanner />
       <AIConversation>
         <AIConversationContent>
           <InfiniteScrollTrigger

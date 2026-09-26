@@ -19,3 +19,5 @@ export const vapiSecretsAtom = atom<{
 } | null>(null);
 export const hasVapiSecretsAtom = atom((get) => get(vapiSecretsAtom) !== null);
 
+export const activeQueueEntryAtom = atom<Doc<"supportQueue"> | null>(null);
+
