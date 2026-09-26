@@ -66,3 +66,14 @@ _Active development._
 - **Shared UI**: `@workspace/ui` package with shadcn/ui components and Geist font
 - **TypeScript**: Strict TypeScript across all packages; shared `tsconfig` bases
 - **Fonts**: Geist (sans) and Geist Mono throughout both Next.js apps
+
+
+### Human Queue Support
+
+| Phase | Tasks |
+|-------|-------|
+| **Phase 1: Backend Schema & Core Functions** | Update `schema.ts`, create `public/queue.ts`, `private/queue.ts`, `system/queue.ts`, upgrade `escalateConversation.ts`. |
+| **Phase 2: Context Handoff & Summarization** | Add AI summary generator function triggered upon escalation. |
+| **Phase 3: Widget Queue & Real-Time UX** | Add queue atoms, widget queue status banner in chat, callback scheduling modal, and live queue-to-call transition in `apps/widget`. |
+| **Phase 4: Operator Dashboard Integration** | Add Agent Presence Switch, Live Queue Drawer/Panel, and Call Handling UI in `apps/web`. |
+| **Phase 5: Validation & Documentation** | Type-checking, end-to-end verification, and updating `AGENTS.md` + `docs/architecture.md`. |
