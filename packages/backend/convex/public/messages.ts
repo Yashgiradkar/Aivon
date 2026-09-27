@@ -7,6 +7,9 @@ import { escalateConversation } from "../system/ai/tools/escalateConversation";
 import { resolveConversation } from "../system/ai/tools/resolveConversation";
 import { saveMessage } from "@convex-dev/agent";
 import { search } from "../system/ai/tools/search";
+import { sanitizeUserInput, validateAgentOutput, checkRateLimit } from "../system/ai/security";
+import { logAIOperation } from "../system/ai/observability";
+import { estimateTokens } from "../system/ai/context";
 
 export const create = action({
   args: {
@@ -79,6 +82,18 @@ export const create = action({
       if (err instanceof ConvexError) throw err;
     }
 
+    // Rate limiting per contact session to prevent runaway loops or denial of service
+    const rateLimit = checkRateLimit(args.contactSessionId, 30, 60000);
+    if (!rateLimit.isAllowed) {
+      throw new ConvexError({
+        code: "RATE_LIMITED",
+        message: "You are sending messages too quickly. Please wait a few seconds before trying again.",
+      });
+    }
+
+    // Sanitize user input & screen for prompt injection attempts
+    const sanitizedInput = sanitizeUserInput(args.prompt);
+
     // Refresh contact session asynchronously so message creation TTFB is immediate
     await ctx.scheduler.runAfter(0, internal.system.contactSessions.refresh, {
       contactSessionId: args.contactSessionId,
@@ -97,13 +112,16 @@ export const create = action({
     const shouldTriggerAgent =
       conversation.status === "unresolved" && isSubscribed;
 
+    const startTime = Date.now();
+    const cleanPrompt = sanitizedInput.sanitizedText;
+
     // Write the user message and trigger AI, then denormalize the last message preview
     if (shouldTriggerAgent) {
-      await supportAgent.generateText(
+      const response = await supportAgent.generateText(
         ctx,
         { threadId: args.threadId },
         {
-          prompt: args.prompt,
+          prompt: cleanPrompt,
           tools: {
             escalateConversationTool: escalateConversation,
             resolveConversationTool: resolveConversation,
@@ -111,11 +129,35 @@ export const create = action({
           }
         },
       );
-      // After AI responds, the last message will be from the assistant
+
+      // Validate output against system leak guardrails
+      const validated = validateAgentOutput(response.text);
+      const lastText = validated.sanitizedResponse || cleanPrompt;
+
+      const inputTokens = estimateTokens(cleanPrompt);
+      const outputTokens = estimateTokens(validated.sanitizedResponse);
+      const latencyMs = Date.now() - startTime;
+
+      logAIOperation({
+        event: "llm.response",
+        organizationId: conversation.organizationId,
+        conversationId: conversation._id,
+        threadId: args.threadId,
+        model: "gpt-4o-mini",
+        latencyMs,
+        inputTokens,
+        outputTokens,
+        details: {
+          isSuspiciousInput: sanitizedInput.isSuspicious,
+          outputViolations: validated.violations,
+        },
+      });
+
+      // Update last message with the assistant's response (or prompt if result is empty)
       await ctx.runMutation(internal.system.conversations.updateLastMessage, {
         conversationId: conversation._id,
-        lastMessageText: args.prompt, // Show the user's trigger message as last
-        lastMessageRole: "user",
+        lastMessageText: lastText,
+        lastMessageRole: response.text ? "assistant" : "user",
         lastMessageAt: Date.now(),
       });
     } else {
@@ -123,12 +165,12 @@ export const create = action({
         threadId: args.threadId,
         message: {
           role: "user",
-          content: args.prompt,
+          content: cleanPrompt,
         },
       });
       await ctx.runMutation(internal.system.conversations.updateLastMessage, {
         conversationId: conversation._id,
-        lastMessageText: args.prompt,
+        lastMessageText: cleanPrompt,
         lastMessageRole: "user",
         lastMessageAt: Date.now(),
       });

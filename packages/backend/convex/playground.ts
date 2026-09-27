@@ -1,5 +1,7 @@
+// @ts-ignore
 import { definePlaygroundAPI } from "@convex-dev/agent-playground";
 import { components } from "./_generated/api";
+
 import { supportAgent } from "./system/ai/agents/supportAgent";
 
 /**

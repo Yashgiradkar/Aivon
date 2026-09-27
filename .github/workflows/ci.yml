@@ -1,0 +1,52 @@
+name: CI & Quality Gates
+
+on:
+  push:
+    branches: [main, master, feature/**, staging]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  quality-gates:
+    name: Production AI Hardening & Quality Gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.4.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile=false
+
+      - name: 1. Monorepo Lint
+        run: pnpm lint
+
+      - name: 2. TypeScript Validation (Web Dashboard)
+        run: pnpm --filter web typecheck
+
+      - name: 3. TypeScript Validation (Widget)
+        run: pnpm --filter widget typecheck
+
+      - name: 4. Security & Guardrails Unit Tests
+        run: pnpm test
+
+      - name: 5. Evaluation Benchmark Smoke Test
+        run: pnpm eval
+
+      - name: 6. Monorepo Build Gate
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_CONVEX_URL: "https://mock.convex.cloud"
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_mock"
+          CLERK_SECRET_KEY: "sk_test_mock"

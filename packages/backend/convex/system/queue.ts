@@ -3,6 +3,7 @@ import { internalMutation, internalQuery, internalAction } from "../_generated/s
 import { internal } from "../_generated/api";
 import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { supportAgent } from "./ai/agents/supportAgent";
 
 const AVG_CALL_DURATION_SECONDS = 180; // 3 minutes per call estimate
 
@@ -238,11 +239,26 @@ export const generateSummary = internalAction({
     if (!conversation) return;
 
     try {
+      const messagesData = await supportAgent.listMessages(ctx, {
+        threadId: conversation.threadId,
+        paginationOpts: { numItems: 10, cursor: null },
+      });
+
+      const transcript = (messagesData.page || [])
+        .map((m: any) => {
+          const role = m.role === "user" ? "Customer" : "Assistant";
+          const text = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+          return `${role}: ${text}`;
+        })
+        .join("\n");
+
       const response = await generateText({
         model: openai("gpt-4o-mini"),
         system:
-          "You are an AI support assistant handoff summarizer. Summarize the customer's problem, actions attempted, key context, and the escalation reason in 3-4 concise bullet points for a human operator.",
-        prompt: `Generate an escalation summary for conversation ${args.conversationId} with threadId ${conversation.threadId}.`,
+          "You are an AI support assistant handoff summarizer. Summarize the customer's problem, key details, what was tried, and the escalation reason in 3-4 concise bullet points for the human operator.",
+        prompt: transcript
+          ? `Conversation transcript:\n\n${transcript}\n\nProvide the 3-4 bullet handoff summary.`
+          : `Customer escalated without previous message history.`,
       });
 
       await ctx.runMutation(internal.system.queue.setSummary, {
