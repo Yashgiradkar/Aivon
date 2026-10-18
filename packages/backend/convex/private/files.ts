@@ -13,6 +13,7 @@ import rag from "../system/ai/rag";
 import { Id } from "../_generated/dataModel";
 import { paginationOptsValidator } from "convex/server";
 import { internal } from "../_generated/api";
+import { TenantBM25Cache } from "../system/ai/rag/bm25";
 
 function guessMimeType(filename: string, bytes: ArrayBuffer): string {
   return (
@@ -81,6 +82,8 @@ export const deleteFile = mutation({
     await rag.deleteAsync(ctx, {
       entryId: args.entryId
     });
+
+    TenantBM25Cache.invalidate(orgId);
   },
 });
 
@@ -157,6 +160,8 @@ export const addFile = action({
     if (!created) {
       console.debug("entry already exists, skipping upload metadata");
       await ctx.storage.delete(storageId);
+    } else {
+      TenantBM25Cache.invalidate(orgId);
     }
 
     return {

@@ -6,7 +6,7 @@
 		"build": "turbo build",
 		"dev": "turbo dev",
 		"lint": "turbo lint",
-		"test": "tsx eval/tests/securityAndGuardrails.test.ts && tsx eval/tests/contextAndRouting.test.ts && tsx eval/tests/multiFormatRagAndJudge.test.ts && tsx eval/tests/voiceAndElevenLabs.test.ts",
+		"test": "tsx eval/tests/securityAndGuardrails.test.ts && tsx eval/tests/contextAndRouting.test.ts && tsx eval/tests/multiFormatRagAndJudge.test.ts && tsx eval/tests/voiceAndElevenLabs.test.ts && tsx eval/tests/hybridRagAndBM25.test.ts",
 		"eval": "tsx eval/runEval.ts",
 
 		"format": "prettier --write \"**/*.{ts,tsx,md}\""

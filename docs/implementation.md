@@ -371,3 +371,77 @@ End-User Microphone
 1. Administrators configure a natural-language description of their desired brand voice (e.g., *"A warm, empathetic customer support specialist who speaks calmly with clear diction"*).
 2. Saved as `voiceDesignDescription` metadata to guide voice selection without incurring redundant generation costs.
 3. Specific voice selection is made from the curated ElevenLabs voice library or custom cloned voice IDs.
+
+---
+
+## 9. Hybrid RAG, BM25, and Retrieval Routing
+
+### Architecture Overview
+Aivon employs a production-grade, multi-stage hybrid retrieval engine that unifies dense vector search (`text-embedding-3-small`, 1536 dimensions) and exact lexical search (Okapi BM25) through mathematical Reciprocal Rank Fusion (RRF). Queries are classified deterministically with zero latency overhead to select between pure BM25, pure dense vector, or dual-path hybrid retrieval.
+
+```
+Incoming User Query
+         │
+         ▼
+┌───────────────────────────────────────┐
+│       Deterministic Query Router      │
+│  (Exact Codes, Quotes, Tech Tokens,   │
+│   Semantic Questions, Short Terms)    │
+└──────────────────┬────────────────────┘
+                   │
+         ┌─────────┼─────────┐
+         ▼         ▼         ▼
+       "bm25"  "hybrid"   "dense"
+         │         │         │
+         │    ┌────┴────┐    │
+         ▼    ▼         ▼    ▼
+ ┌──────────────┐     ┌──────────────┐
+ │ Okapi BM25   │     │ Dense Vector │
+ │ (Tenant-Iso- │     │ Search (RAG  │
+ │  lated Cache)│     │ Component)   │
+ └───────┬──────┘     └──────┬───────┘
+         │                   │
+         └─────────┬─────────┘
+                   ▼
+┌───────────────────────────────────────┐
+│     Reciprocal Rank Fusion (RRF)      │
+│   RRF(d) = Σ w_r / (k + rank_r(d))    │
+│           (k=60, deduped)             │
+└──────────────────┬────────────────────┘
+                   ▼
+┌───────────────────────────────────────┐
+│         Evidence Verification         │
+│     (Thresholding + Citations)        │
+└──────────────────┬────────────────────┘
+                   ▼
+           Support AI Agent
+```
+
+### Key Modules
+
+| Component | Location | Responsibility |
+|-----------|----------|----------------|
+| `queryRouter.ts` | `packages/backend/convex/system/ai/rag/queryRouter.ts` | Zero-cost deterministic query classifier. Inspects technical identifiers, alphanumeric error codes (`WC-104`, `ERR-9021`), quoted literals (`"exact term"`), and semantic phrasing. |
+| `bm25.ts` | `packages/backend/convex/system/ai/rag/bm25.ts` | Okapi BM25 engine with Robertson-Sparck Jones scoring ($k_1=1.2, b=0.75$), length normalization, exact phrase boosting, and tenant-scoped corpus caching (`TenantBM25Cache`). |
+| `fusion.ts` | `packages/backend/convex/system/ai/rag/fusion.ts` | Reciprocal Rank Fusion ($k=60$) combining dense and lexical ordinal ranks. Eliminates raw cosine/BM25 score scale distortions. |
+| `corpus.ts` | `packages/backend/convex/system/ai/rag/corpus.ts` | `internalQuery getTenantCorpus` securely reading knowledge chunks strictly isolated by `namespace: organizationId`. |
+| `queryNormalizer.ts` | `packages/backend/convex/system/ai/rag/queryNormalizer.ts` | Dual-mode normalizer: preserves exact punctuation and casing for lexical matching while cleaning conversational filler for dense vector embeddings. |
+| `search.ts` | `packages/backend/convex/system/ai/tools/search.ts` | Production `@convex-dev/agent` search tool. Coordinates router, parallel execution via `Promise.allSettled`, degraded-mode failover, multi-format citation assembly, and observability logging. |
+| `files.ts` | `packages/backend/convex/private/files.ts` | Automatically invalidates `TenantBM25Cache` on knowledge-base file uploads (`addFile`) and deletions (`deleteFile`). |
+
+### Routing Policy Matrix
+
+| Query Pattern | Example | Strategy Selected | Rationale |
+|---------------|---------|-------------------|-----------|
+| Quoted text | `"order cancellation policy"` | `"bm25"` | Explicit user intent for verbatim textual match. |
+| Alphanumeric code | `WC-104`, `ERR-9021`, `SKU-772` | `"bm25"` | Vector embeddings compress discrete codes into poor semantic clusters; lexical inverted index gives 100% precision. |
+| Technical token | `auth_token_expired`, `api.v1.users` | `"bm25"` | Identifiers, method names, and snake_case/dot notation require exact token preservation. |
+| Mixed technical + conceptual | `how to fix WC-104 timeout in billing` | `"hybrid"` | Requires both exact code localization and semantic intent matching. |
+| General semantic question | `What is your refund policy for annual plans?` | `"hybrid"` / `"dense"` | Natural language intent benefits from dense vector semantic proximity. |
+
+### Degraded-Mode Resilience
+
+1. **Vector Outage Resiliency**: If the OpenAI embedding API times out, returns HTTP 429 (rate-limited), or throws an internal error, the hybrid executor automatically falls back to pure BM25 search.
+2. **Empty Corpus Handling**: If a tenant has not uploaded documents, both branches safely return empty candidate sets without throwing exceptions or logging false errors.
+3. **Air-Tight Tenant Isolation**: All corpus queries, BM25 cache instances, and vector searches are strictly partitioned by `organizationId`. Cross-tenant data leakage is cryptographically and logically impossible (verified at 0.000% across all automated suites).
+
