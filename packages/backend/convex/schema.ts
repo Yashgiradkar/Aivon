@@ -155,4 +155,39 @@ export default defineSchema({
   users: defineTable({
     name: v.string(),
   }),
+  evaluations: defineTable({
+    organizationId: v.string(),
+    conversationId: v.id("conversations"),
+    threadId: v.string(),
+    traceId: v.optional(v.string()),
+    userQuestion: v.string(),
+    agentAnswer: v.string(),
+    retrievedEvidence: v.optional(v.string()),
+    evidenceIds: v.optional(v.array(v.string())),
+    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
+    judgeModel: v.string(),
+    rubricVersion: v.string(),
+    scores: v.optional(v.object({
+      faithfulness: v.object({ score: v.number(), rationale: v.string() }),
+      answerRelevance: v.object({ score: v.number(), rationale: v.string() }),
+      contextRelevance: v.object({ score: v.number(), rationale: v.string() }),
+      completeness: v.object({ score: v.number(), rationale: v.string() }),
+      citationValidity: v.object({ pass: v.boolean(), rationale: v.string() }),
+      policyCompliance: v.object({ pass: v.boolean(), rationale: v.string() }),
+      toolUseCorrectness: v.optional(v.object({ score: v.number(), rationale: v.string() })),
+      overallScore: v.number(),
+      needsHumanReview: v.boolean(),
+    })),
+    humanReviewStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("flagged"))),
+    humanReviewNotes: v.optional(v.string()),
+    humanReviewedBy: v.optional(v.string()),
+    humanReviewedAt: v.optional(v.number()),
+    latencyMs: v.optional(v.number()),
+    costUsd: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_conversation_id", ["conversationId"])
+    .index("by_organization_id_and_status", ["organizationId", "status"]),
 });
+

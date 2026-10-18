@@ -160,6 +160,16 @@ export const create = action({
         lastMessageRole: response.text ? "assistant" : "user",
         lastMessageAt: Date.now(),
       });
+
+      // Asynchronously trigger LLM-as-a-Judge evaluation without blocking customer response
+      await ctx.scheduler.runAfter(0, internal.system.ai.evaluation.actions.evaluateInteraction, {
+        organizationId: conversation.organizationId,
+        conversationId: conversation._id,
+        threadId: args.threadId,
+        userQuestion: cleanPrompt,
+        agentAnswer: lastText,
+        toolsUsed: ["searchTool"],
+      });
     } else {
       await saveMessage(ctx, components.agent, {
         threadId: args.threadId,
