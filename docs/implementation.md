@@ -323,3 +323,51 @@ Client-side state (active screen, session, etc.) uses Jotai atoms. Jotai's `Prov
 - **Convex function arguments**: Validated by Convex's `v.*` validators at runtime (schema-level).
 - **Form inputs**: Validated with Zod schemas via `react-hook-form` + `@hookform/resolvers/zod`.
 - **File type detection**: `guessMimeTypeFromExtension` + `guessMimeTypeFromContents` from `@convex-dev/rag` with fallback to `application/octet-stream`.
+
+---
+
+## Voice AI Architecture (ElevenLabs & Vapi Integration)
+
+### Overview
+Aivon provides real-time, low-latency, full-duplex conversational voice support embedded directly in the end-user chat widget and managed via the operator dashboard. Voice sessions use **Vapi** as the default orchestration layer and **ElevenLabs** as the primary text-to-speech (TTS) synthesis engine, with optional **ElevenLabs Scribe** / **Deepgram** speech-to-text (STT).
+
+### Pipeline Flow
+```
+End-User Microphone
+  └─► Widget WebRTC (Vapi Web SDK)
+      └─► STT (ElevenLabs Scribe / Deepgram Nova-2)
+          └─► Vapi Orchestration Layer
+              ├─► Webhook / Tools (Convex /vapi-webhook)
+              │    ├─ RAG Search (org-scoped knowledge base)
+              │    ├─ Escalate (system/conversations:escalate + queue)
+              │    └─ Resolve (system/conversations:resolve)
+              └─► TTS Synthesis (ElevenLabs Turbo v2.5 / Flash v2.5)
+                  └─► WebRTC Stream Playback (with Turn Guard & Barge-in)
+```
+
+### Key Modules
+| Component | Location | Responsibility |
+|-----------|----------|----------------|
+| `schema.ts` | `packages/backend/convex/schema.ts` | Extends `widgetSettings.voiceSettings` with voice model, speed, stability, language, and interruption tuning. |
+| `voiceSettings.ts` (private) | `packages/backend/convex/private/voiceSettings.ts` | Clerk-authenticated mutations/queries for dashboard voice configuration and voice library listing. |
+| `voiceSettings.ts` (public) | `packages/backend/convex/public/voiceSettings.ts` | Unauthenticated public query for widget clients to fetch voice overrides safely. |
+| `use-vapi.ts` | `apps/widget/modules/widget/hooks/use-vapi.ts` | WebRTC lifecycle, permission management, assistant overrides, turn-ID guards, and barge-in listeners. |
+| `voice-settings-view.tsx` | `apps/web/modules/voice-settings/ui/views/` | Operator dashboard UI at `/plugins/voice` for voice design, multilingual selection, and sensitivity tuning. |
+| `vapiWebhook.ts` | `packages/backend/convex/system/vapiWebhook.ts` | RAG search execution, spoken markdown formatting, and call transcript persistence. |
+| `http.ts` | `packages/backend/convex/http.ts` | Exposes `/vapi-webhook` for Vapi tool calls and `end-of-call-report` events. |
+
+### Barge-In & Interruption Handling
+1. **Turn-ID Guard**: Every assistant utterance is tagged with a monotonically increasing turn ID (`currentTurnId`).
+2. **Immediate Cancellation**: When `user-interrupted` fires from Vapi VAD, `currentTurnId` is immediately advanced, transitioning the widget state to `listening` and clearing any partial live transcripts.
+3. **Chunk Invalidation**: Any late-arriving speech audio packets tagged with prior turn IDs are strictly dropped, preventing cancelled speech from bleeding into subsequent turns.
+4. **Noise Guard**: `stopSpeakingPlan` configures `acknowledgementPhrases` ("uh-huh", "yeah", "okay") to prevent transient acoustic noise from falsely interrupting the agent, and `interruptionPhrases` ("stop", "wait", "hold on") for immediate hard stoppage.
+
+### Multilingual Support
+- **Languages Supported**: English (`en`), Hindi (`hi`), Marathi (`mr`).
+- **TTS Compatibility**: Hindi and Marathi speech synthesis strictly enforce multilingual models (`eleven_turbo_v2_5`, `eleven_flash_v2_5`, or `eleven_multilingual_v2`).
+- **STT Transcription**: ElevenLabs Scribe or Deepgram configured with explicit ISO language codes.
+
+### Voice Design Workflow
+1. Administrators configure a natural-language description of their desired brand voice (e.g., *"A warm, empathetic customer support specialist who speaks calmly with clear diction"*).
+2. Saved as `voiceDesignDescription` metadata to guide voice selection without incurring redundant generation costs.
+3. Specific voice selection is made from the curated ElevenLabs voice library or custom cloned voice IDs.

@@ -45,6 +45,8 @@ export const upsert = mutation({
         maxMessagesPerConversation: args.maxMessagesPerConversation,
         defaultSuggestions: args.defaultSuggestions,
         vapiSettings: args.vapiSettings,
+        // NOTE: voiceSettings are managed separately via private/voiceSettings.ts
+        // Do not overwrite here to avoid wiping ElevenLabs config on every customization save.
       });
     } else {
       await ctx.db.insert("widgetSettings", {

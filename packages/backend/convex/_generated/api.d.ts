@@ -23,6 +23,7 @@ import type * as private_plugins from "../private/plugins.js";
 import type * as private_queue from "../private/queue.js";
 import type * as private_secrets from "../private/secrets.js";
 import type * as private_vapi from "../private/vapi.js";
+import type * as private_voiceSettings from "../private/voiceSettings.js";
 import type * as private_widgetSettings from "../private/widgetSettings.js";
 import type * as public_contactSessions from "../public/contactSessions.js";
 import type * as public_conversations from "../public/conversations.js";
@@ -30,6 +31,7 @@ import type * as public_messages from "../public/messages.js";
 import type * as public_organizations from "../public/organizations.js";
 import type * as public_queue from "../public/queue.js";
 import type * as public_secrets from "../public/secrets.js";
+import type * as public_voiceSettings from "../public/voiceSettings.js";
 import type * as public_widgetSettings from "../public/widgetSettings.js";
 import type * as system_ai_agents_supportAgent from "../system/ai/agents/supportAgent.js";
 import type * as system_ai_cache_index from "../system/ai/cache/index.js";
@@ -70,6 +72,7 @@ import type * as system_plugins from "../system/plugins.js";
 import type * as system_queue from "../system/queue.js";
 import type * as system_secrets from "../system/secrets.js";
 import type * as system_subscriptions from "../system/subscriptions.js";
+import type * as system_vapiWebhook from "../system/vapiWebhook.js";
 import type * as system_widgetSettings from "../system/widgetSettings.js";
 import type * as users from "../users.js";
 
@@ -103,6 +106,7 @@ declare const fullApi: ApiFromModules<{
   "private/queue": typeof private_queue;
   "private/secrets": typeof private_secrets;
   "private/vapi": typeof private_vapi;
+  "private/voiceSettings": typeof private_voiceSettings;
   "private/widgetSettings": typeof private_widgetSettings;
   "public/contactSessions": typeof public_contactSessions;
   "public/conversations": typeof public_conversations;
@@ -110,6 +114,7 @@ declare const fullApi: ApiFromModules<{
   "public/organizations": typeof public_organizations;
   "public/queue": typeof public_queue;
   "public/secrets": typeof public_secrets;
+  "public/voiceSettings": typeof public_voiceSettings;
   "public/widgetSettings": typeof public_widgetSettings;
   "system/ai/agents/supportAgent": typeof system_ai_agents_supportAgent;
   "system/ai/cache/index": typeof system_ai_cache_index;
@@ -150,6 +155,7 @@ declare const fullApi: ApiFromModules<{
   "system/queue": typeof system_queue;
   "system/secrets": typeof system_secrets;
   "system/subscriptions": typeof system_subscriptions;
+  "system/vapiWebhook": typeof system_vapiWebhook;
   "system/widgetSettings": typeof system_widgetSettings;
   users: typeof users;
 }>;

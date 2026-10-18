@@ -20,11 +20,33 @@ export default defineSchema({
       assistantId: v.optional(v.string()),
       phoneNumber: v.optional(v.string()),
     }),
+    // ElevenLabs / multilingual voice configuration (applied as Vapi overrides at call start)
+    voiceSettings: v.optional(v.object({
+      // TTS
+      elevenLabsVoiceId: v.optional(v.string()),          // e.g. "rachel" or custom voice ID
+      elevenLabsModel: v.optional(v.string()),             // e.g. "eleven_turbo_v2_5"
+      elevenLabsStability: v.optional(v.number()),         // 0–1
+      elevenLabsSimilarityBoost: v.optional(v.number()),   // 0–1
+      elevenLabsSpeed: v.optional(v.number()),             // 0.7–1.2
+      elevenLabsOptimizeStreamingLatency: v.optional(v.number()), // 0–4, default 3
+      // STT
+      transcriberProvider: v.optional(v.string()),         // "11labs" | "deepgram" (default)
+      transcriberLanguage: v.optional(v.string()),         // ISO 639-1: "en", "hi", "mr"
+      // Interruption / turn-taking
+      interruptionNumWords: v.optional(v.number()),        // words before stop (default 0)
+      interruptionVoiceSeconds: v.optional(v.number()),    // VAD seconds (default 0.2)
+      interruptionBackoffSeconds: v.optional(v.number()),  // re-speak delay (default 1)
+      startSpeakingWaitSeconds: v.optional(v.number()),    // pre-speech pause (default 0.4)
+      // Voice Design metadata (stored separately from voiceId — not re-generated per call)
+      voiceDesignDescription: v.optional(v.string()),      // natural-language design prompt
+      voiceDesignType: v.optional(v.string()),             // "library" | "generated"
+      voiceConfigVersion: v.optional(v.number()),          // monotone increment on config change
+    })),
   })
   .index("by_organization_id", ["organizationId"]),
   plugins: defineTable({
     organizationId: v.string(),
-    service: v.union(v.literal("vapi")),
+    service: v.union(v.literal("vapi"), v.literal("elevenlabs")),
     secretName: v.string(),
   })
     .index("by_organization_id", ["organizationId"])

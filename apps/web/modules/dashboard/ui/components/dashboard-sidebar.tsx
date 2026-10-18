@@ -10,6 +10,7 @@ import {
   Mic,
   PaletteIcon,
   ScaleIcon,
+  Volume2Icon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -68,6 +69,11 @@ const configurationItems = [
     title: "Voice Assistant",
     url: "/plugins/vapi",
     icon: Mic,
+  },
+  {
+    title: "Voice Settings",
+    url: "/plugins/voice",
+    icon: Volume2Icon,
   },
 ];
 
