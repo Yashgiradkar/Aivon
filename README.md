@@ -1,6 +1,6 @@
 # Aivon — AI Customer Support Platform
 
-> An AI-powered customer support platform with a chat widget, dashboard for agents, and an embeddable script — all in a single Turborepo monorepo.
+> A production-grade, multi-tenant AI customer support platform with a chat widget, operator dashboard, embeddable script, voice-first travel agent, multi-agent orchestration, hybrid RAG retrieval, LLM evaluation, and AI safety guardrails — all in a single Turborepo monorepo.
 
 ---
 
@@ -13,6 +13,11 @@
 - [Environment Variables](#environment-variables)
 - [How to Run](#how-to-run)
 - [Project Structure](#project-structure)
+- [AI Architecture](#ai-architecture)
+- [Voice-First Travel Agent](#voice-first-travel-agent)
+- [Multi-Agent Orchestration](#multi-agent-orchestration)
+- [Hybrid RAG Retrieval](#hybrid-rag-retrieval)
+- [AI Safety & Evaluation](#ai-safety--evaluation)
 - [API Endpoints](#api-endpoints)
 - [Build & Deployment](#build--deployment)
 
@@ -20,7 +25,9 @@
 
 ## Project Description
 
-Aivon is a full-stack, multi-tenant AI customer support platform. It allows businesses (organisations) to deploy an embeddable chat widget on their website that connects end-users to a RAG-powered AI support agent. The agent searches a per-organisation knowledge base to answer questions, can escalate conversations to human agents, and marks conversations as resolved — all in real time. Operators manage conversations, upload knowledge-base files, configure the widget, and integrate with third-party services (e.g. Vapi for voice) through a dedicated web dashboard.
+Aivon is a production-grade, full-stack, multi-tenant AI customer support platform. It allows businesses to deploy an embeddable chat widget on their website that connects end-users to a multi-agent AI system backed by a hybrid RAG knowledge base. Beyond standard customer support, Aivon includes a **voice-first AI travel agent** — a standalone voice interface where users interact naturally through speech to search routes, compare fares, and confirm bookings.
+
+The system's AI layer is orchestrated by a **multi-agent orchestration engine** that dynamically routes requests across specialized capabilities (support, travel, escalation). All AI output passes through **security guardrails** (input sanitization, rate limiting, output validation). Conversation quality is measured by an **LLM-as-a-Judge evaluation pipeline** with human review. Operators manage conversations, upload knowledge-base files, configure the widget, and integrate with third-party services through a dedicated dashboard.
 
 ---
 
@@ -190,18 +197,21 @@ Aivon/
 │   ├── web/                  # Operator dashboard (Next.js 15, App Router)
 │   │   ├── app/
 │   │   │   ├── (auth)/       # Sign-in / Sign-up pages
-│   │   │   └── (dashboard)/  # Protected dashboard routes
-│   │   │       ├── conversations/   # Conversation inbox & detail view
-│   │   │       ├── customization/   # Widget appearance settings
-│   │   │       ├── files/           # Knowledge-base file uploads
-│   │   │       ├── integrations/    # Third-party integrations
-│   │   │       ├── plugins/         # Plugin management (e.g. Vapi)
-│   │   │       └── billing/         # Subscription & billing
+│   │   │   ├── (dashboard)/  # Protected dashboard routes
+│   │   │   │   ├── conversations/   # Conversation inbox & detail view
+│   │   │   │   ├── customization/   # Widget appearance settings
+│   │   │   │   ├── files/           # Knowledge-base file uploads
+│   │   │   │   ├── evaluations/     # AI quality & LLM-as-a-Judge inspection
+│   │   │   │   ├── integrations/    # Third-party integrations
+│   │   │   │   ├── plugins/         # Plugin management (Vapi, voice)
+│   │   │   │   └── billing/         # Subscription & billing
+│   │   │   └── (travel)/     # Voice-first travel agent (public)
+│   │   │       └── travel/   # Web Speech API voice interface
 │   │   ├── components/       # Shared dashboard UI components
-│   │   ├── modules/          # Feature modules (auth, dashboard, files, …)
+│   │   ├── modules/          # Feature modules (auth, dashboard, files, evaluations, …)
 │   │   ├── hooks/            # Custom React hooks
 │   │   ├── lib/              # Utility functions
-│   │   └── middleware.ts     # Clerk auth & org-redirect middleware
+│   │   └── middleware.ts     # Clerk auth & org-redirect middleware (travel route public)
 │   │
 │   ├── widget/               # End-user chat widget (Next.js 15)
 │   │   ├── app/              # Widget page & layout
@@ -229,6 +239,28 @@ Aivon/
 │   │           ├── ai/
 │   │           │   ├── agents/       # AI support agent definition
 │   │           │   ├── tools/        # Agent tools (search, escalate, resolve)
+│   │           │   ├── orchestration/# Multi-agent orchestration layer
+│   │           │   │   ├── types.ts       # Capability & routing contracts
+│   │           │   │   ├── router.ts      # Deterministic intent router
+│   │           │   │   ├── planner.ts     # Execution plan builder
+│   │           │   │   ├── registry.ts    # Capability registry
+│   │           │   │   └── executor.ts    # Plan executor
+│   │           │   ├── travel/       # Voice-first travel agent
+│   │           │   │   ├── types.ts       # Domain contracts & state machine types
+│   │           │   │   ├── normalizer.ts  # Slot extraction & speech correction
+│   │           │   │   ├── provider.ts    # Deterministic travel provider
+│   │           │   │   ├── workflow.ts    # Multi-turn workflow state machine
+│   │           │   │   └── capability.ts  # Orchestration capability definition
+│   │           │   ├── rag/          # Hybrid RAG retrieval
+│   │           │   │   ├── bm25.ts        # Okapi BM25 engine
+│   │           │   │   ├── fusion.ts      # Reciprocal Rank Fusion (RRF)
+│   │           │   │   ├── queryRouter.ts # Deterministic query classifier
+│   │           │   │   └── corpus.ts      # Tenant-scoped corpus query
+│   │           │   ├── security/     # AI safety guardrails
+│   │           │   │   ├── sanitizer.ts   # Input sanitization & PII redaction
+│   │           │   │   ├── guardrails.ts  # Output schema validation
+│   │           │   │   └── rateLimiter.ts # Sliding-window rate limiter
+│   │           │   ├── evaluation/   # LLM-as-a-Judge evaluation
 │   │           │   └── constants.ts  # LLM system prompts
 │   │           └── subscriptions.ts  # Subscription mutation
 │   │
@@ -685,11 +717,15 @@ apps/widget/
 
 | Capability | Details |
 |---|---|
+| **Multi-Agent Orchestration** | Deterministic intent router + execution planner coordinating specialized capabilities (support, travel, escalation) |
+| **Voice-First Travel Agent** | Web Speech API voice interface for natural speech booking of trains, flights & buses with multi-turn state machine |
 | **AI Support Agent** | Tool-using agent (gpt-4o-mini) with autonomous search, escalate, and resolve actions |
-| **RAG Knowledge Base** | Per-org vector search; multi-modal ingestion (PDF, images, HTML, text) |
+| **Hybrid RAG Knowledge Base** | Okapi BM25 + dense vector search fused with Reciprocal Rank Fusion (RRF); per-org namespaced |
+| **AI Safety Guardrails** | Input sanitization, PII redaction, prompt injection detection, output schema validation, sliding-window rate limiting |
+| **LLM Evaluation Pipeline** | LLM-as-a-Judge rubric scoring with human review workflow and per-org quality analytics |
 | **Embeddable Widget** | Single `<script>` tag; iframe-based; programmatic API |
 | **Real-time Dashboard** | Operator conversation inbox with live updates via Convex |
-| **Voice Support** | Vapi AI integration for phone/voice channel in the widget |
+| **Voice Support** | Vapi AI integration for phone/voice channel in the widget (ElevenLabs TTS, barge-in) |
 | **Multi-tenant** | Per-org data isolation; Clerk multi-org auth; subscription-gated AI |
 | **Operator AI Assist** | AI-polishes operator message drafts before sending |
 
@@ -705,20 +741,34 @@ apps/widget/
 └──────────────────────────────────────────┘
            │ Convex real-time
            ▼
-┌─ Convex Backend ─────────────────────────┐
-│  public/  ← widget (session auth)        │
-│  private/ ← dashboard (Clerk JWT)        │
-│  system/  ← AI agent + RAG + internals  │
-│    └─ supportAgent (gpt-4o-mini)         │
-│         ├─ searchTool (RAG)              │
-│         ├─ escalateConversationTool      │
-│         └─ resolveConversationTool       │
-└──────────────────────────────────────────┘
+┌─ Convex Backend ─────────────────────────────────────────────┐
+│  public/   ← widget (session auth)                           │
+│  private/  ← dashboard (Clerk JWT)                           │
+│  system/   ← AI + RAG + internals                            │
+│    ├─ Orchestration Layer                                     │
+│    │    ├─ ConversationRouter  (intent classification)        │
+│    │    ├─ OrchestrationPlanner (execution planning)          │
+│    │    ├─ CapabilityRegistry  (capability discovery)         │
+│    │    └─ PlanExecutor        (safe execution)               │
+│    ├─ supportAgent (gpt-4o-mini)                              │
+│    │    ├─ searchTool (Hybrid RAG: BM25 + Dense + RRF)        │
+│    │    ├─ escalateConversationTool                           │
+│    │    └─ resolveConversationTool                            │
+│    ├─ TravelAgentCapability                                   │
+│    │    ├─ TravelWorkflowManager (state machine)              │
+│    │    ├─ TravelNormalizer (slot extraction + corrections)   │
+│    │    └─ DeterministicMockTravelProvider (booking)          │
+│    └─ AI Safety Layer                                         │
+│         ├─ InputSanitizer (PII + injection guards)            │
+│         ├─ RateLimiter (sliding window per session)           │
+│         └─ OutputGuardrails (schema validation)               │
+└──────────────────────────────────────────────────────────────┘
            │ Convex real-time
            ▼
 ┌─ Operator Dashboard ─────────────────────┐
 │  apps/web (Next.js, port 3000)           │
 │  Clerk multi-org auth                    │
+│  /travel — Voice-First Travel Agent      │
 └──────────────────────────────────────────┘
 ```
 
@@ -754,9 +804,19 @@ apps/widget/
 ### End-User Sends a Support Message
 1. Widget loads → creates contact session (name + email)
 2. User starts conversation → agent thread created with greeting message
-3. User types message → AI agent searches knowledge base, responds, or escalates
-4. If no knowledge base match → agent offers human support
-5. If human requested → conversation escalated, operator takes over
+3. User types message → **Orchestration layer** classifies intent, selects capability
+4. Support agent executes **hybrid RAG** search (BM25 + dense vector + RRF) against org knowledge base
+5. Input/output pass through **AI safety guardrails** before response is saved
+6. If no KB match → agent escalates; operator takes over via queue
+
+### Voice-First Travel Booking
+1. Navigate to `/travel` (publicly accessible, no auth required)
+2. Press the voice orb → browser requests microphone via Web Speech API
+3. Speak naturally: *"I need to travel from Nagpur to Mumbai tomorrow morning"*
+4. `TravelNormalizer` extracts slots (origin, destination, date, mode, time window) and handles speech corrections (*"Mumbai—sorry, Pune"*)
+5. `TravelWorkflowManager` drives state through: `GREETING → COLLECTING_REQUIREMENTS → CLARIFYING → SEARCHING → PRESENTING_OPTIONS → AWAITING_SELECTION → AWAITING_CONFIRMATION → BOOKED`
+6. Confirmed bookings execute via `DeterministicMockTravelProvider` with idempotency keys; unconfirmed bookings are strictly rejected
+7. Speech synthesis reads results back; transcript log displayed in real time
 
 ### Operator Handles a Conversation
 1. Signs in to dashboard → sees conversation inbox
@@ -768,21 +828,34 @@ apps/widget/
 ### Setting Up a Knowledge Base
 1. Go to **Files** in dashboard
 2. Upload PDF, image, or text documents
-3. Files are automatically extracted and indexed into per-org RAG
-4. Agent will use these documents to answer user questions
+3. Files are extracted (multi-modal: image/PDF/HTML/text) and indexed into per-org hybrid RAG
+4. BM25 corpus cache is invalidated automatically on upload or deletion
+5. Agent uses BM25+dense+RRF retrieval for every knowledge search
+
+### Reviewing Conversation Quality
+1. Go to **Evaluations** in dashboard
+2. LLM-as-a-Judge rubric scores conversations on faithfulness, relevance, and resolution quality
+3. Operators can add human review annotations
+4. Quality analytics visible per org over time
 
 ---
 
 ### Feature List
 
+* **Multi-Agent Orchestration** — Deterministic `ConversationRouter` → `OrchestrationPlanner` → `CapabilityRegistry` → `PlanExecutor` pipeline coordinating multiple AI capabilities.
+* **Voice-First Travel Agent** — Standalone `/travel` page with Web Speech API recognition/synthesis, multi-turn `TravelWorkflowManager`, consequential action guardrails, idempotency protection, and 100% test coverage.
+* **Hybrid RAG Knowledge Base** — Okapi BM25 + dense vector search (text-embedding-3-small) fused via Reciprocal Rank Fusion (RRF k=60) with deterministic query routing.
+* **AI Safety Guardrails** — Sliding-window rate limiting, input sanitization, PII redaction (`[REDACTED_CC]`, `[REDACTED_SSN]`), prompt injection heuristics, and LLM output schema validation.
+* **LLM Evaluation Pipeline** — LLM-as-a-Judge (v2026.1 rubric) scoring faithfulness, relevance, and resolution; human review workflow; per-org quality analytics dashboard.
 * **Convex Backend** — Serverless DB, functions, real-time updates, and end-to-end TypeScript.
 * **Public/Private Access Control** — Separate widget and operator functions with session/JWT-based authorization.
-* **Multi-Tenant RAG** — Organization-scoped vector search using `orgId` namespaces for strict data isolation.
+* **Multi-Tenant Data Isolation** — Organization-scoped vector search, BM25 corpus cache, RAG namespace, and secret keys. Zero cross-tenant leakage.
 * **Secure API Key Management** — AWS Secrets Manager stores tenant-specific third-party credentials; only secret references reside in DB.
 * **Anonymous Contact Sessions** — 24-hour widget sessions with user identity and browser metadata for conversation tracking.
 * **Tool-Using AI Agent** — Stateful support agent with knowledge search, escalation, and resolution tools.
 * **Two-Stage LLM Search** — RAG retrieval followed by LLM interpretation for conversational responses.
 * **Multi-Modal Knowledge Ingestion** — Model-routed processing for PDFs, images, HTML, and text.
+* **Voice AI (Vapi + ElevenLabs)** — WebRTC voice calls in widget with barge-in, turn-ID guards, multilingual TTS (EN/HI/MR).
 * **Turborepo Monorepo** — Shared packages and coordinated builds across web, widget, and embed applications.
 * **Subscription-Gated AI** — AI operations restricted to active subscriptions with Clerk webhook synchronization.
 
@@ -839,16 +912,109 @@ pnpm typecheck
 
 ---
 
-## Summary of Created Documentation
+## Voice-First Travel Agent
 
-| File                       | Description                                                                                                                                                    |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **AGENTS.md**              | Agent guide containing project context, architecture, conventions, critical invariants, safe modification workflows, build commands, and common pitfalls.      |
-| **docs/architecture.md**   | System architecture overview, application boundaries, data flow diagrams, multi-tenancy model, and external integration points.                                |
-| **docs/development.md**    | Local environment setup, prerequisites, environment variables for all packages, dev commands, and testing guidelines.                                          |
-| **docs/implementation.md** | Deep dive into core business logic: Contact Sessions, AI Support Agent, RAG indexing & retrieval pipeline, Conversation lifecycle, and Vapi Voice integration. |
-| **docs/api.md**            | Complete Convex API reference covering `public/*`, `private/*`, `system/*` functions, schemas, error codes, and HTTP endpoints.                                |
-| **docs/deployment.md**     | Deployment guides for Vercel (`apps/web`, `apps/widget`), CDN hosting (`apps/embed`), and Convex production backend.                                           |
-| **docs/decisions.md**      | Architectural Decision Records (ADRs) detailing technology choices, trade-offs, and design rationales.                                                         |
-| **CHANGELOG.md**           | Chronological changelog organized by functional modules and components.                                                                                        |
+A standalone voice interface accessible at `/travel` (no authentication required). Users speak naturally to search, compare, and book travel.
+
+### State Machine
+
+```
+GREETING → COLLECTING_REQUIREMENTS → CLARIFYING → SEARCHING
+    → PRESENTING_OPTIONS → AWAITING_SELECTION → AWAITING_CONFIRMATION → BOOKED
+```
+
+### Key Modules
+
+| Module | Path | Responsibility |
+|--------|------|----------------|
+| `TravelNormalizer` | `system/ai/travel/normalizer.ts` | Slot extraction, location code resolution, relative date parsing, speech correction |
+| `TravelWorkflowManager` | `system/ai/travel/workflow.ts` | State machine — one call per spoken turn |
+| `DeterministicMockTravelProvider` | `system/ai/travel/provider.ts` | Train/flight/bus schedules, fare calculation, consequential booking with idempotency |
+| `TravelAgentCapability` | `system/ai/travel/capability.ts` | Orchestration capability interface |
+| `public/travel.ts` | `convex/public/travel.ts` | Convex queries & mutations (session CRUD, turn processing, booking retrieval) |
+| Travel page | `apps/web/app/(travel)/travel/page.tsx` | Web Speech API voice orb, transcript log, confirmation UI |
+
+### Consequential Action Guardrails
+- Bookings execute **only** after `confirmedByCustomer === true`
+- Idempotency keys prevent duplicate reservations
+- `travelSessions` and `travelBookings` tables store all state in Convex
+
+### Tests
+```bash
+pnpm test:travel   # runs travelNormalizer.test.ts + travelWorkflow.test.ts (100% pass)
+```
+
+---
+
+## Multi-Agent Orchestration
+
+A pluggable orchestration layer that sits between incoming user messages and individual AI capabilities.
+
+```
+User Message
+    │
+    ▼
+ConversationRouter  →  classifies intent (support_inquiry, travel_inquiry, escalation_request, …)
+    │
+    ▼
+OrchestrationPlanner  →  builds ExecutionPlan (ordered steps + capability references)
+    │
+    ▼
+CapabilityRegistry  →  resolves CapabilityDefinition by name
+    │
+    ▼
+PlanExecutor  →  executes steps, collects results, handles partial failures
+```
+
+### Adding a New Capability
+1. Create `system/ai/<name>/capability.ts` implementing `CapabilityDefinition`
+2. Add routing regex to `system/ai/orchestration/router.ts`
+3. Add execution plan entry in `system/ai/orchestration/planner.ts`
+4. Register in `system/ai/orchestration/registry.ts`
+
+---
+
+## Hybrid RAG Retrieval
+
+Every knowledge base search uses a three-path retrieval architecture:
+
+| Path | Engine | Best For |
+|------|--------|----------|
+| `bm25` | Okapi BM25 (k₁=1.2, b=0.75) | Exact codes, quoted strings, technical identifiers |
+| `dense` | text-embedding-3-small (1536d) | Semantic questions, natural language |
+| `hybrid` | BM25 + Dense → RRF (k=60) | Mixed technical + conceptual queries |
+
+Query routing is **deterministic and zero-cost** (regex-based, no LLM call). Degraded mode: if OpenAI embedding API fails, falls back to pure BM25.
+
+---
+
+## AI Safety & Evaluation
+
+### Safety Guardrails (applied to every public/messages.ts call)
+| Layer | Module | Action |
+|-------|--------|--------|
+| Input sanitization | `security/sanitizer.ts` | Strips control chars, wraps in `<untrusted_user_input>`, redacts PII |
+| Rate limiting | `security/rateLimiter.ts` | Sliding-window per `contactSessionId` |
+| Output validation | `security/guardrails.ts` | Schema checks, system-prompt leakage detection |
+
+### LLM Evaluation
+- **Rubric:** v2026.1 (faithfulness, relevance, resolution quality, safety)
+- **Judge model:** gpt-4o-mini scoring 1–5 per dimension
+- **Human review:** Operators annotate disagreements in the Evaluations dashboard
+- **Analytics:** Per-org score trends visible over time
+
+---
+
+## Summary of Documentation
+
+| File | Description |
+|------|-------------|
+| **AGENTS.md** | Agent guide: project context, conventions, critical invariants, safe modification workflows, build commands, pitfalls |
+| **docs/architecture.md** | System architecture, application boundaries, data flow diagrams, queue state machine, agent assignment algorithm |
+| **docs/development.md** | Local setup, prerequisites, environment variables, dev commands, test guidelines |
+| **docs/implementation.md** | Core business logic: sessions, conversation FSM, AI agent, hybrid RAG, plugin/secrets, voice AI, orchestration, evaluation |
+| **docs/api.md** | Complete Convex API reference: `public/*`, `private/*`, `system/*`, schemas, error codes, HTTP endpoints |
+| **docs/deployment.md** | Deployment guides: Vercel (web/widget), CDN (embed), Convex production backend |
+| **docs/decisions.md** | Architectural Decision Records (ADRs): technology choices, trade-offs, design rationales |
+| **CHANGELOG.md** | Chronological changelog by phase: security, LLM routing, hybrid RAG, evaluation, orchestration, voice travel agent |
 

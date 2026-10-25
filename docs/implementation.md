@@ -445,3 +445,147 @@ Incoming User Query
 2. **Empty Corpus Handling**: If a tenant has not uploaded documents, both branches safely return empty candidate sets without throwing exceptions or logging false errors.
 3. **Air-Tight Tenant Isolation**: All corpus queries, BM25 cache instances, and vector searches are strictly partitioned by `organizationId`. Cross-tenant data leakage is cryptographically and logically impossible (verified at 0.000% across all automated suites).
 
+---
+
+## Multi-Agent Orchestration
+
+The orchestration layer lives in `convex/system/ai/orchestration/` and is called by `public/messages.ts` on every incoming user message.
+
+### Intent Routing
+
+`ConversationRouter` uses deterministic regex patterns — no LLM call, zero latency overhead:
+
+```typescript
+// router.ts
+const TRAVEL_REGEX = /\b(travel|train|flight|bus|book|ticket|route|fare|depart|arrive|nagpur|mumbai|delhi|pune)\b/i;
+const ESCALATION_REGEX = /\b(human|agent|operator|speak to someone|transfer)\b/i;
+
+function classify(text: string): RoutingCategory {
+  if (TRAVEL_REGEX.test(text)) return "travel_inquiry";
+  if (ESCALATION_REGEX.test(text)) return "escalation_request";
+  return "support_inquiry"; // default
+}
+```
+
+### Execution Planning
+
+`OrchestrationPlanner` maps each `RoutingCategory` to an ordered `ExecutionPlan`:
+
+```typescript
+// planner.ts
+const PLANS: Record<RoutingCategory, ExecutionPlan> = {
+  support_inquiry:    { steps: [{ capability: "support_agent", required: true }] },
+  travel_inquiry:     { steps: [{ capability: "travel_agent",  required: true }] },
+  escalation_request: { steps: [{ capability: "escalation",    required: true }] },
+};
+```
+
+### Extending with a New Capability
+
+1. Create `system/ai/<name>/capability.ts` — implement `CapabilityDefinition`
+2. Add regex pattern to `orchestration/router.ts` → new `RoutingCategory` value
+3. Add plan entry in `orchestration/planner.ts`
+4. Call `registry.register(new MyCapability())` in `orchestration/registry.ts`
+
+---
+
+## Voice-First Travel Agent
+
+### Design Principles
+
+1. **Speech is the interaction modality.** The LLM understands language; application code owns validation, state transitions, and consequential execution.
+2. **Consequential actions require explicit confirmation.** No booking fires unless `confirmedByCustomer === true`.
+3. **Idempotency is mandatory.** Every `initiateBooking` call carries an idempotency key; duplicate requests return the original booking reference.
+
+### TravelNormalizer (`normalizer.ts`)
+
+Stateless slot extraction from free-form speech:
+
+| Method | Input | Output |
+|--------|-------|--------|
+| `resolveLocation(raw)` | `"bombay"`, `"ngp"` | `{ name: "Mumbai", code: "CSMT" }` |
+| `normalizeDate(raw)` | `"day after tomorrow"` | `"2026-10-27"` (relative to referenceMs) |
+| `extractTimeWindow(raw)` | `"between 7 and 10"` | `{ start: "07:00", end: "10:00" }` |
+| `extractTransportMode(raw)` | `"vande bharat"` | `"train"` |
+| `extractOptionSelection(raw, n)` | `"choose the second one"` | `1` (0-indexed) |
+| `detectConfirmationIntent(raw)` | `"yes confirm"` | `"confirm"` |
+| `extractOriginAndDestination(raw, slots)` | `"Nagpur to Mumbai—sorry, Pune"` | `{ origin: "Nagpur", destination: "Pune" }` |
+
+**Speech Correction**: The normalizer handles mid-sentence corrections via two regex patterns:
+- Dash-based: `to [wrong city]—sorry, [corrected]`
+- Spoken keyword: `to [wrong city], sorry, [corrected]`
+
+### TravelWorkflowManager (`workflow.ts`)
+
+State machine with one method: `processTurn(params) → TravelTurnResult`.
+
+```
+GREETING
+    ↓ (origin + destination extracted)
+COLLECTING_REQUIREMENTS
+    ↓ (date extracted)
+    ↓ (transport mode extracted)
+CLARIFYING
+    ↓ (departure window extracted OR "any time")
+SEARCHING
+    ↓ (search executed)
+PRESENTING_OPTIONS / AWAITING_SELECTION
+    ↓ (ordinal selection)
+AWAITING_CONFIRMATION     ←── cancel ──┐
+    ↓ ("yes confirm")          returns to AWAITING_SELECTION
+BOOKED
+```
+
+Slot accumulation: `extractAndMergeSlots` merges new information into existing slots each turn. Already-filled slots persist across turns.
+
+### DeterministicMockTravelProvider (`provider.ts`)
+
+Contains hardcoded Indian train/flight/bus schedules used for deterministic testing.
+
+```typescript
+async initiateBooking(params: BookingParams): Promise<BookingResult> {
+  // STRICT GATE: no booking without explicit confirmation
+  if (!params.confirmedByCustomer) {
+    return { success: false, status: "failed",
+      error: "Explicit customer confirmation is strictly required before any reservation." };
+  }
+  // Idempotency: return existing booking if key seen before
+  const existing = this.bookings.get(params.idempotencyKey);
+  if (existing) return existing;
+  // Execute booking...
+}
+```
+
+### Convex Public API (`public/travel.ts`)
+
+| Function | Type | Purpose |
+|----------|------|---------|
+| `createSession` | mutation | Create `travelSession` with 4h TTL; return session token |
+| `processTurn` | action | Validate session, run `TravelWorkflowManager.processTurn`, persist updated state |
+| `getSession` | query | Fetch session state and current slots |
+| `getBookings` | query | List confirmed bookings for a session |
+| `cancelSession` | mutation | Mark session expired |
+
+### Frontend (`apps/web/app/(travel)/travel/page.tsx`)
+
+- Web Speech API `SpeechRecognition` for input; `speechSynthesis.speak()` for output
+- Animated voice orb (listening / speaking / idle states)
+- Barge-in: user can speak while agent is responding; recognition restarts on `SpeechRecognitionError`
+- Scrollable real-time transcript log
+- Explicit confirmation UI: booking summary card + confirm/cancel buttons
+- Accessible at `/travel` — public route, no Clerk auth
+
+### Test Coverage
+
+```bash
+pnpm test:travel
+# eval/tests/travelNormalizer.test.ts  — 7 test suites (100% pass)
+# eval/tests/travelWorkflow.test.ts    — 5 turns + 3 guardrail suites (100% pass)
+```
+
+Key assertions validated:
+- Consequential action blocked without explicit confirmation
+- Duplicate idempotency key returns original PNR
+- Speech correction (`Mumbai—sorry, Pune`) resolves to `Pune`
+- `"start over"` resets all slots and transitions to `COLLECTING_REQUIREMENTS`
+

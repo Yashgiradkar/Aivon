@@ -210,6 +210,8 @@ sequenceDiagram
 | `supportQueue` | `organizationId`, `conversationId`, `contactSessionId`, `status`, `priority`, `position`, `assignedAgentId`, `aiSummary`, `isCallback` | `by_organization_id`, `by_organization_id_and_status`, `by_contact_session_id`, `by_conversation_id`, `by_assigned_agent` |
 | `supportAgentAvailability` | `organizationId`, `agentId`, `agentName`, `status`, `currentConversationId`, `currentQueueEntryId` | `by_organization_id`, `by_organization_id_and_status`, `by_agent_id` |
 | `supportCalls` | `organizationId`, `queueEntryId`, `conversationId`, `contactSessionId`, `agentId`, `status`, `startedAt`, `durationSeconds` | `by_organization_id`, `by_queue_entry_id`, `by_conversation_id` |
+| `travelSessions` | `sessionToken`, `organizationId`, `state`, `slots`, `expiresAt` | `by_session_token` |
+| `travelBookings` | `travelSessionId`, `bookingReference`, `idempotencyToken`, `status`, `optionId`, `passengers` | `by_session_token`, `by_idempotency_token`, `by_booking_reference` |
 | `users` | `name` | (none — dev/test stub) |
 
 **Agent/RAG tables** are managed by `@convex-dev/agent` and `@convex-dev/rag` components — they exist in the Convex instance but are not in `schema.ts`.
@@ -267,6 +269,78 @@ Convex has no traditional background job queue. Async work is handled via:
 | `next` | ^15 | React framework |
 | `jotai` | ^2 | Client-side state management |
 | `turbo` | ^2 | Monorepo build orchestration |
+
+---
+
+## Multi-Agent Orchestration Layer
+
+The orchestration layer decouples message routing from AI execution. It sits in `convex/system/ai/orchestration/` and is invoked by `public/messages.ts` before any AI capability runs.
+
+```mermaid
+flowchart TD
+    M[Incoming User Message] --> R[ConversationRouter]
+    R -->|support_inquiry| S[SupportAgentCapability]
+    R -->|travel_inquiry| T[TravelAgentCapability]
+    R -->|escalation_request| E[EscalationCapability]
+    S --> P[OrchestrationPlanner]
+    T --> P
+    E --> P
+    P --> X[PlanExecutor]
+    X --> CR[CapabilityRegistry]
+    CR --> S2[Execute Capability]
+    S2 --> DB[(Convex DB — persist result)]
+```
+
+### Components
+
+| Module | File | Responsibility |
+|--------|------|----------------|
+| `ConversationRouter` | `orchestration/router.ts` | Deterministic regex-based intent classification; zero LLM cost |
+| `OrchestrationPlanner` | `orchestration/planner.ts` | Maps routing category to ordered `ExecutionPlan` steps |
+| `CapabilityRegistry` | `orchestration/registry.ts` | Singleton registry; `getCapability(name)` returns `CapabilityDefinition` |
+| `PlanExecutor` | `orchestration/executor.ts` | Runs plan steps sequentially; handles partial failures gracefully |
+| `RoutingCategory` | `orchestration/types.ts` | Discriminated union of all intent types including `travel_inquiry` |
+
+---
+
+## Voice-First Travel Agent Data Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User (Browser)
+    participant WS as Web Speech API
+    participant TP as /travel page
+    participant CV as public/travel (Convex)
+    participant WF as TravelWorkflowManager
+    participant NR as TravelNormalizer
+    participant PR as DeterministicMockTravelProvider
+
+    U->>TP: Press voice orb
+    TP->>WS: SpeechRecognition.start()
+    WS-->>TP: Spoken transcript
+    TP->>CV: processTurn(spokenText, sessionToken)
+    CV->>NR: extractAndMergeSlots(text, existingSlots)
+    NR-->>CV: updatedSlots
+    CV->>WF: processTurn(state, slots, text)
+    alt All slots collected
+        WF->>PR: search(origin, destination, date, mode)
+        PR-->>WF: TravelOption[]
+        WF-->>CV: {nextState: AWAITING_SELECTION, options}
+    else Missing slot
+        WF-->>CV: {nextState: CLARIFYING, spokenResponse}
+    end
+    CV-->>TP: TravelTurnResult
+    TP->>WS: speechSynthesis.speak(spokenResponse)
+    U-->>TP: "Choose the first one"
+    TP->>CV: processTurn(..., AWAITING_SELECTION)
+    CV->>WF: processTurn (option selection)
+    WF-->>CV: {nextState: AWAITING_CONFIRMATION, confirmationRequired: true}
+    U-->>TP: "Yes confirm booking"
+    TP->>CV: processTurn(..., AWAITING_CONFIRMATION)
+    CV->>PR: initiateBooking({confirmedByCustomer: true, idempotencyKey})
+    PR-->>CV: {success: true, bookingReference}
+    CV-->>TP: {nextState: BOOKED, bookingResult}
+```
 
 
 
