@@ -1,10 +1,12 @@
 import { estimateTokens, estimateMessageTokens } from "./tokenEstimator";
 import { wrapUntrustedUserInput, wrapRetrievedKnowledge } from "../security/sanitizer";
+import { MemoryManagerLogic } from "../memory/memoryManager";
 
 export interface ContextAssemblyOptions {
   systemPrompt: string;
   retrievedKnowledge?: string;
   persistentSummary?: string;
+  customerMemories?: Array<{ memoryType: string; key: string; content: string; confidence: number }>;
   recentMessages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
   currentUserInput: string;
   maxTotalTokens?: number;
@@ -50,6 +52,15 @@ export function buildContextWindow(options: ContextAssemblyOptions): AssembledCo
     remainingBudget -= estimateTokens(summaryBlock);
   }
 
+  // 2b. Add cross-session long-term memory if available
+  let memoryBlock = "";
+  if (options.customerMemories && options.customerMemories.length > 0) {
+    memoryBlock = MemoryManagerLogic.formatMemoryPromptBlock(options.customerMemories, Math.min(300, Math.floor(remainingBudget * 0.2)));
+    if (memoryBlock) {
+      remainingBudget -= estimateTokens(memoryBlock);
+    }
+  }
+
   // 3. Sliding window over recent messages (from newest to oldest)
   const selectedMessages: Array<{ role: string; content: string }> = [];
   let includedCount = 0;
@@ -72,6 +83,7 @@ export function buildContextWindow(options: ContextAssemblyOptions): AssembledCo
   const parts: string[] = [];
   if (knowledgeBlock) parts.push(knowledgeBlock);
   if (summaryBlock) parts.push(summaryBlock);
+  if (memoryBlock) parts.push(memoryBlock);
 
   if (selectedMessages.length > 0) {
     const historyText = selectedMessages

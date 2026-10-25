@@ -7,9 +7,11 @@ import { escalateConversation } from "../system/ai/tools/escalateConversation";
 import { resolveConversation } from "../system/ai/tools/resolveConversation";
 import { saveMessage } from "@convex-dev/agent";
 import { search } from "../system/ai/tools/search";
-import { sanitizeUserInput, validateAgentOutput, checkRateLimit } from "../system/ai/security";
+import { sanitizeUserInput, validateAgentOutput, checkRateLimit, ModerationPipeline } from "../system/ai/security";
 import { logAIOperation } from "../system/ai/observability";
 import { estimateTokens } from "../system/ai/context";
+import { MemoryManagerLogic } from "../system/ai/memory/memoryManager";
+import { SemanticCacheLogic } from "../system/ai/cache/semanticCache";
 
 export const create = action({
   args: {
@@ -83,16 +85,37 @@ export const create = action({
     }
 
     // Rate limiting per contact session to prevent runaway loops or denial of service
-    const rateLimit = checkRateLimit(args.contactSessionId, 30, 60000);
-    if (!rateLimit.isAllowed) {
+    const sessionRateLimit = checkRateLimit(args.contactSessionId, 30, 60000);
+    if (!sessionRateLimit.isAllowed) {
       throw new ConvexError({
         code: "RATE_LIMITED",
         message: "You are sending messages too quickly. Please wait a few seconds before trying again.",
       });
     }
 
-    // Sanitize user input & screen for prompt injection attempts
-    const sanitizedInput = sanitizeUserInput(args.prompt);
+    // Tenant-level distributed rate limit admission (Free / Pro / Enterprise)
+    const tenantAdmission = await ctx.runMutation(internal.system.rateLimits.checkAndAdmit, {
+      organizationId: conversation.organizationId,
+      estimatedTokens: 600,
+    });
+    if (!tenantAdmission.allowed) {
+      const quotaExceeded = "reason" in tenantAdmission && tenantAdmission.reason === "QUOTA_EXHAUSTED";
+      throw new ConvexError({
+        code: quotaExceeded ? "QUOTA_EXHAUSTED" : "RATE_LIMITED",
+        message: quotaExceeded
+          ? "Monthly AI token quota exceeded for your organization's subscription plan. Please upgrade to continue."
+          : "Organization rate limit reached. Please wait a moment before sending more messages.",
+      });
+    }
+
+    // Multi-stage input moderation
+    const moderation = ModerationPipeline.moderateInput(args.prompt);
+    if (moderation.flagged && moderation.riskLevel === "critical") {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Your message violates safety guidelines and cannot be processed.",
+      });
+    }
 
     // Refresh contact session asynchronously so message creation TTFB is immediate
     await ctx.scheduler.runAfter(0, internal.system.contactSessions.refresh, {
@@ -113,15 +136,35 @@ export const create = action({
       conversation.status === "unresolved" && isSubscribed;
 
     const startTime = Date.now();
-    const cleanPrompt = sanitizedInput.sanitizedText;
+    const cleanPrompt = moderation.sanitizedText;
 
-    // Write the user message and trigger AI, then denormalize the last message preview
+    // Fetch active long-term memories for this customer
+    const customerIdentifier = contactSession.email || String(args.contactSessionId);
+    let promptForAgent = cleanPrompt;
+
     if (shouldTriggerAgent) {
+      try {
+        const activeMemories = await ctx.runQuery(internal.system.memory.getActiveCustomerMemories, {
+          organizationId: conversation.organizationId,
+          customerIdentifier,
+        });
+
+        if (activeMemories && activeMemories.length > 0) {
+          const memoryBlock = MemoryManagerLogic.formatMemoryPromptBlock(activeMemories, 300);
+          if (memoryBlock) {
+            promptForAgent = `${memoryBlock}\n\nCustomer: ${cleanPrompt}`;
+          }
+        }
+      } catch {
+        // Fallback gracefully without memories if query fails
+        promptForAgent = cleanPrompt;
+      }
+
       const response = await supportAgent.generateText(
         ctx,
         { threadId: args.threadId },
         {
-          prompt: cleanPrompt,
+          prompt: promptForAgent,
           tools: {
             escalateConversationTool: escalateConversation,
             resolveConversationTool: resolveConversation,
@@ -130,12 +173,13 @@ export const create = action({
         },
       );
 
-      // Validate output against system leak guardrails
-      const validated = validateAgentOutput(response.text);
+      // Multi-stage output moderation
+      const outputModeration = ModerationPipeline.moderateOutput(response.text);
+      const validated = validateAgentOutput(outputModeration.sanitizedText);
       const lastText = validated.sanitizedResponse || cleanPrompt;
 
-      const inputTokens = estimateTokens(cleanPrompt);
-      const outputTokens = estimateTokens(validated.sanitizedResponse);
+      const inputTokens = estimateTokens(promptForAgent);
+      const outputTokens = estimateTokens(lastText);
       const latencyMs = Date.now() - startTime;
 
       logAIOperation({
@@ -148,17 +192,36 @@ export const create = action({
         inputTokens,
         outputTokens,
         details: {
-          isSuspiciousInput: sanitizedInput.isSuspicious,
+          isSuspiciousInput: moderation.flagged,
           outputViolations: validated.violations,
         },
       });
 
-      // Update last message with the assistant's response (or prompt if result is empty)
+      // Update last message with the assistant's response
       await ctx.runMutation(internal.system.conversations.updateLastMessage, {
         conversationId: conversation._id,
         lastMessageText: lastText,
         lastMessageRole: response.text ? "assistant" : "user",
         lastMessageAt: Date.now(),
+      });
+
+      // Reconcile actual token consumption in distributed rate limiter
+      await ctx.runMutation(internal.system.rateLimits.reconcileTokens, {
+        organizationId: conversation.organizationId,
+        estimatedTokensReserved: 600,
+        actualTokensUsed: inputTokens + outputTokens,
+      });
+
+      // Asynchronously enqueue durable memory extraction job
+      await ctx.runMutation(internal.system.jobs.enqueueJob, {
+        organizationId: conversation.organizationId,
+        jobType: "memory_extraction",
+        payload: JSON.stringify({
+          organizationId: conversation.organizationId,
+          customerIdentifier,
+          conversationId: conversation._id,
+          text: `Customer: ${cleanPrompt}\nAssistant: ${lastText}`,
+        }),
       });
 
       // Asynchronously trigger LLM-as-a-Judge evaluation without blocking customer response

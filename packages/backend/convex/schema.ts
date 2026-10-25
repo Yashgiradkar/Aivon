@@ -211,5 +211,99 @@ export default defineSchema({
     .index("by_organization_id", ["organizationId"])
     .index("by_conversation_id", ["conversationId"])
     .index("by_organization_id_and_status", ["organizationId", "status"]),
+
+  customerMemories: defineTable({
+    organizationId: v.string(),
+    customerIdentifier: v.string(), // Normalized customer email or identifier
+    contactSessionId: v.optional(v.id("contactSessions")),
+    memoryType: v.union(v.literal("semantic"), v.literal("episodic"), v.literal("entity")),
+    key: v.string(), // e.g. "preference.communication_channel", "entity.device_model"
+    content: v.string(),
+    confidence: v.number(), // 0.0 to 1.0
+    provenance: v.object({
+      conversationId: v.optional(v.id("conversations")),
+      source: v.string(),
+      extractedAt: v.number(),
+    }),
+    status: v.union(
+      v.literal("active"),
+      v.literal("superseded"),
+      v.literal("expired"),
+      v.literal("deleted")
+    ),
+    expiresAt: v.optional(v.number()),
+    contentHash: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_org_and_customer", ["organizationId", "customerIdentifier", "status"])
+    .index("by_org_and_type", ["organizationId", "memoryType"])
+    .index("by_expires_at", ["expiresAt"]),
+
+  semanticAnswerCache: defineTable({
+    organizationId: v.string(),
+    canonicalQuery: v.string(),
+    queryHash: v.string(),
+    response: v.string(),
+    evidenceIds: v.array(v.string()),
+    sourceDocuments: v.array(v.string()),
+    model: v.string(),
+    knowledgeVersion: v.string(),
+    hitCount: v.number(),
+    lastAccessedAt: v.number(),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_org_and_query_hash", ["organizationId", "queryHash"])
+    .index("by_org_and_expires", ["organizationId", "expiresAt"]),
+
+  backgroundJobs: defineTable({
+    organizationId: v.string(),
+    jobType: v.union(
+      v.literal("document_ingestion"),
+      v.literal("evaluation_batch"),
+      v.literal("memory_extraction"),
+      v.literal("cache_maintenance")
+    ),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("running"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("cancelled")
+    ),
+    priority: v.union(v.literal("low"), v.literal("normal"), v.literal("high")),
+    payload: v.string(), // Serialized JSON input payload or storage reference
+    idempotencyKey: v.string(),
+    attempts: v.number(),
+    maxAttempts: v.number(),
+    progress: v.optional(v.number()), // 0 - 100
+    error: v.optional(v.string()),
+    result: v.optional(v.string()),
+    scheduledFor: v.number(),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_org_and_status", ["organizationId", "status"])
+    .index("by_idempotency_key", ["idempotencyKey"])
+    .index("by_status_and_scheduled", ["status", "scheduledFor"]),
+
+  tenantRateLimits: defineTable({
+    organizationId: v.string(),
+    tier: v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise")),
+    tokensUsedThisMonth: v.number(),
+    monthlyTokenQuota: v.number(),
+    monthlyPeriodStart: v.number(),
+    requestsThisMinute: v.number(),
+    minuteWindowStart: v.number(),
+    concurrentOperationsActive: v.number(),
+    maxConcurrentOperations: v.number(),
+    lastActiveAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"]),
 });
 
