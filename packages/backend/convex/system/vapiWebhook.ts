@@ -1,11 +1,8 @@
 import { ConvexError, v } from "convex/values";
 import { internalAction, internalMutation } from "../_generated/server";
 import { internal, components } from "../_generated/api";
-import rag from "./ai/rag";
-import { normalizeSearchQuery } from "./ai/rag/queryNormalizer";
-import { rerankSearchResults } from "./ai/rag/reranker";
 import { saveMessage } from "@convex-dev/agent";
-import { logAIOperation } from "./ai/observability/logger";
+import { executeUnifiedRetrieval, detectAmbiguousVoiceIdentifier } from "./ai/rag/unifiedSearch";
 import { Id } from "../_generated/dataModel";
 
 // ---------------------------------------------------------------------------
@@ -32,7 +29,7 @@ function formatForSpeech(text: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Internal action: execute RAG search for voice assistant
+// Internal action: execute RAG search for voice assistant with unified hybrid routing & ambiguity detection
 // ---------------------------------------------------------------------------
 export const executeVoiceSearch = internalAction({
   args: {
@@ -41,28 +38,31 @@ export const executeVoiceSearch = internalAction({
     conversationId: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<string> => {
-    const normalized = normalizeSearchQuery(args.query);
-    const searchResult = await rag.search(ctx, {
-      namespace: args.organizationId,
-      query: normalized || args.query,
-      limit: 4,
+    // 1. Spoken policy number ambiguity detection
+    const ambiguity = detectAmbiguousVoiceIdentifier(args.query);
+    if (ambiguity.isAmbiguous && ambiguity.suggestedClarification) {
+      return ambiguity.suggestedClarification;
+    }
+
+    // 2. Execute unified multi-format hybrid retrieval (same as chat)
+    const result = await executeUnifiedRetrieval(ctx, {
+      organizationId: args.organizationId,
+      query: args.query,
+      limit: 3,
+      source: "voice",
     });
 
-    if (!searchResult.entries || searchResult.entries.length === 0) {
+    if (result.evidenceItems.length === 0) {
       return "I could not find specific details about that in our knowledge base. Would you like me to connect you with a human support specialist?";
     }
 
-    const reranked = await rerankSearchResults(args.query, searchResult.entries, 2);
-    const bestText = reranked.entries.map((e) => e.text).join(". ");
+    const bestText = result.evidenceItems.map((e) => e.text).join(". ");
     const spoken = formatForSpeech(bestText);
 
-    logAIOperation({
-      event: "rag.search",
-      organizationId: args.organizationId,
-      details: { source: "voice", query: args.query, hitsCount: searchResult.entries.length },
-    });
-
-    return spoken || "I found relevant information in our knowledge base, but I cannot summarize it right now.";
+    return (
+      spoken ||
+      "I found relevant information in our knowledge base, but I cannot summarize it right now."
+    );
   },
 });
 

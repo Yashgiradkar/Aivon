@@ -56,6 +56,7 @@ import type * as system_ai_rag_reranker from "../system/ai/rag/reranker.js";
 import type * as system_ai_rag_structure_contentBlocks from "../system/ai/rag/structure/contentBlocks.js";
 import type * as system_ai_rag_structure_documentParser from "../system/ai/rag/structure/documentParser.js";
 import type * as system_ai_rag_structure_index from "../system/ai/rag/structure/index.js";
+import type * as system_ai_rag_unifiedSearch from "../system/ai/rag/unifiedSearch.js";
 import type * as system_ai_rag from "../system/ai/rag.js";
 import type * as system_ai_routing_circuitBreaker from "../system/ai/routing/circuitBreaker.js";
 import type * as system_ai_routing_executor from "../system/ai/routing/executor.js";
@@ -143,6 +144,7 @@ declare const fullApi: ApiFromModules<{
   "system/ai/rag/structure/contentBlocks": typeof system_ai_rag_structure_contentBlocks;
   "system/ai/rag/structure/documentParser": typeof system_ai_rag_structure_documentParser;
   "system/ai/rag/structure/index": typeof system_ai_rag_structure_index;
+  "system/ai/rag/unifiedSearch": typeof system_ai_rag_unifiedSearch;
   "system/ai/rag": typeof system_ai_rag;
   "system/ai/routing/circuitBreaker": typeof system_ai_routing_circuitBreaker;
   "system/ai/routing/executor": typeof system_ai_routing_executor;
