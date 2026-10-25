@@ -110,6 +110,28 @@ export class OrchestrationPlanner {
         };
       }
 
+      case "travel_inquiry": {
+        return {
+          planId,
+          routingCategory,
+          estimatedComplexity: "low",
+          requiresApproval: false,
+          tasks: [
+            {
+              taskId: "step_travel",
+              id: "step_travel",
+              capabilityId: "travel_agent",
+              capability: "travel_agent",
+              priority: 1,
+              dependencies: [],
+              dependsOn: [],
+              description: "Process conversational travel exploration and reservation",
+              inputArgs: { prompt: userPrompt },
+            },
+          ],
+        };
+      }
+
       case "knowledge_query":
       case "complex_multi_step":
       default: {

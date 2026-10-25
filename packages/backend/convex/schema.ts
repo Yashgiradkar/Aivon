@@ -337,5 +337,95 @@ export default defineSchema({
     .index("by_conversation_id", ["conversationId"])
     .index("by_idempotency_key", ["idempotencyKey"])
     .index("by_org_and_status", ["organizationId", "status"]),
+
+  travelSessions: defineTable({
+    organizationId: v.string(),
+    sessionToken: v.string(),
+    contactSessionId: v.optional(v.id("contactSessions")),
+    conversationId: v.optional(v.id("conversations")),
+    status: v.union(
+      v.literal("GREETING"),
+      v.literal("COLLECTING_REQUIREMENTS"),
+      v.literal("CLARIFYING"),
+      v.literal("SEARCHING"),
+      v.literal("PRESENTING_OPTIONS"),
+      v.literal("AWAITING_SELECTION"),
+      v.literal("COLLECTING_PASSENGER_DETAILS"),
+      v.literal("AWAITING_CONFIRMATION"),
+      v.literal("EXECUTING_BOOKING"),
+      v.literal("BOOKED"),
+      v.literal("CANCELLED"),
+      v.literal("FAILED")
+    ),
+    extractedSlots: v.object({
+      transportMode: v.optional(v.union(v.literal("train"), v.literal("flight"), v.literal("bus"))),
+      origin: v.optional(v.string()),
+      originCode: v.optional(v.string()),
+      destination: v.optional(v.string()),
+      destinationCode: v.optional(v.string()),
+      travelDate: v.optional(v.string()),
+      departureWindowStart: v.optional(v.string()),
+      departureWindowEnd: v.optional(v.string()),
+      passengerCount: v.optional(v.number()),
+      passengers: v.optional(
+        v.array(
+          v.object({
+            name: v.string(),
+            age: v.optional(v.number()),
+            gender: v.optional(v.string()),
+          })
+        )
+      ),
+      selectedOptionId: v.optional(v.string()),
+      preference: v.optional(v.string()),
+    }),
+    searchResults: v.optional(v.string()), // Serialized JSON array of TravelOption
+    selectedOption: v.optional(v.string()), // Serialized JSON TravelOption
+    confirmationRequired: v.boolean(),
+    confirmedAt: v.optional(v.number()),
+    bookingReference: v.optional(v.string()),
+    idempotencyToken: v.string(),
+    lastSpokenTurn: v.optional(v.string()),
+    lastActiveAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_session_token", ["sessionToken"])
+    .index("by_idempotency_token", ["idempotencyToken"]),
+
+  travelBookings: defineTable({
+    organizationId: v.string(),
+    travelSessionId: v.id("travelSessions"),
+    bookingReference: v.string(),
+    transportMode: v.union(v.literal("train"), v.literal("flight"), v.literal("bus")),
+    origin: v.string(),
+    originCode: v.string(),
+    destination: v.string(),
+    destinationCode: v.string(),
+    travelDate: v.string(),
+    departureTime: v.string(),
+    arrivalTime: v.string(),
+    serviceName: v.string(),
+    serviceNumber: v.string(),
+    fare: v.number(),
+    currency: v.string(),
+    passengers: v.array(
+      v.object({
+        name: v.string(),
+        age: v.number(),
+        gender: v.string(),
+        seatNumber: v.optional(v.string()),
+        status: v.string(),
+      })
+    ),
+    status: v.union(v.literal("confirmed"), v.literal("cancelled"), v.literal("pending")),
+    idempotencyKey: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_booking_reference", ["bookingReference"])
+    .index("by_idempotency_key", ["idempotencyKey"]),
 });
 

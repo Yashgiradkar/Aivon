@@ -48,6 +48,13 @@ export class ConversationRouter {
       return "complex_multi_step";
     }
 
+    if (this.TRAVEL_REGEX.test(trimmed)) {
+      return "travel_inquiry";
+    }
+
     return "knowledge_query";
   }
+
+  private static TRAVEL_REGEX =
+    /\b(travel\s+from|trip\s+to|train\s+to|flight\s+to|bus\s+to|book\s+(train|flight|bus|ticket)|from\s+[a-zA-Z\s]+?\s+to\s+[a-zA-Z\s]+?)\b/i;
 }

@@ -17,7 +17,8 @@ export type RoutingCategory =
   | "policy_exact_lookup"
   | "escalation_request"
   | "resolution_request"
-  | "complex_multi_step";
+  | "complex_multi_step"
+  | "travel_inquiry";
 
 export type TaskOutcomeStatus =
   | "success"

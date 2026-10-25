@@ -10,6 +10,7 @@ import {
 import { escalateConversation } from "../tools/escalateConversation";
 import { resolveConversation } from "../tools/resolveConversation";
 import { search } from "../tools/search";
+import { TravelAgentCapability } from "../travel/capability";
 
 export class CapabilityRegistry {
   private static capabilities = new Map<string, CapabilityDefinition>();
@@ -348,3 +349,4 @@ CapabilityRegistry.register({ ...EscalationCapability, id: "escalate_human" });
 CapabilityRegistry.register(ResolutionCapability);
 CapabilityRegistry.register({ ...ResolutionCapability, id: "resolve_conversation" });
 CapabilityRegistry.register(QualityEvaluationCapability);
+CapabilityRegistry.register(TravelAgentCapability);
