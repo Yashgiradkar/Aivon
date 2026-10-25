@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { internal } from "../_generated/api";
+import { isConfiguredDemoActor } from "../lib/requestSecurity";
 
 export const isDemoOrganization = query({
   args: {},
@@ -10,16 +11,7 @@ export const isDemoOrganization = query({
       return false;
     }
 
-    const orgId = identity.orgId as string;
-    const email = identity.email?.toLowerCase() ?? "";
-
-    // Recognize demo organization by demo user email or org ID patterns
-    return (
-      email.includes("demo") ||
-      orgId.toLowerCase().includes("demo") ||
-      identity.nickname?.toLowerCase().includes("demo") ||
-      false
-    );
+    return isConfiguredDemoActor(identity);
   },
 });
 
@@ -35,6 +27,12 @@ export const initDemoData = mutation({
     }
 
     const orgId = identity.orgId as string;
+    if (!isConfiguredDemoActor(identity)) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Demo seeding is not enabled for this organization",
+      });
+    }
 
     await ctx.scheduler.runAfter(0, internal.system.demo.seedDemoOrganization, {
       organizationId: orgId,

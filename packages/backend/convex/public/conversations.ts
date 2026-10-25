@@ -4,6 +4,7 @@ import { ConvexError, v } from "convex/values";
 import { supportAgent } from "../system/ai/agents/supportAgent";
 import { saveMessage } from "@convex-dev/agent";
 import { paginationOptsValidator } from "convex/server";
+import { MAX_CONVERSATIONS_PER_SESSION } from "../lib/requestSecurity";
 
 export const getMany = query({
   args: {
@@ -22,31 +23,34 @@ export const getMany = query({
 
     const conversations = await ctx.db
       .query("conversations")
-      .withIndex("by_contact_session_id", (q) => 
+      .withIndex("by_contact_session_id", (q) =>
         q.eq("contactSessionId", args.contactSessionId),
       )
       .order("desc")
       .paginate(args.paginationOpts);
 
     // Use denormalized lastMessage fields — zero extra DB calls
-    const conversationsWithLastMessage = conversations.page.map((conversation) => {
-      const lastMessage = conversation.lastMessageText
-        ? {
-            text: conversation.lastMessageText,
-            message: { role: conversation.lastMessageRole ?? "user" },
-            _creationTime: conversation.lastMessageAt ?? conversation._creationTime,
-          }
-        : null;
+    const conversationsWithLastMessage = conversations.page.map(
+      (conversation) => {
+        const lastMessage = conversation.lastMessageText
+          ? {
+              text: conversation.lastMessageText,
+              message: { role: conversation.lastMessageRole ?? "user" },
+              _creationTime:
+                conversation.lastMessageAt ?? conversation._creationTime,
+            }
+          : null;
 
-      return {
-        _id: conversation._id,
-        _creationTime: conversation._creationTime,
-        status: conversation.status,
-        organizationId: conversation.organizationId,
-        threadId: conversation.threadId,
-        lastMessage,
-      };
-    });
+        return {
+          _id: conversation._id,
+          _creationTime: conversation._creationTime,
+          status: conversation.status,
+          organizationId: conversation.organizationId,
+          threadId: conversation.threadId,
+          lastMessage,
+        };
+      },
+    );
 
     return {
       ...conversations,
@@ -109,6 +113,26 @@ export const create = mutation({
       });
     }
 
+    if (session.organizationId !== args.organizationId) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Incorrect organization",
+      });
+    }
+
+    const existingConversations = await ctx.db
+      .query("conversations")
+      .withIndex("by_contact_session_id", (q) =>
+        q.eq("contactSessionId", args.contactSessionId),
+      )
+      .take(MAX_CONVERSATIONS_PER_SESSION);
+    if (existingConversations.length >= MAX_CONVERSATIONS_PER_SESSION) {
+      throw new ConvexError({
+        code: "LIMIT_REACHED",
+        message: "Conversation limit reached for this session",
+      });
+    }
+
     // This refreshes the user's session if they are within the threshold
     await ctx.runMutation(internal.system.contactSessions.refresh, {
       contactSessionId: args.contactSessionId,
@@ -116,7 +140,7 @@ export const create = mutation({
 
     const widgetSettings = await ctx.db
       .query("widgetSettings")
-      .withIndex("by_organization_id", (q) => 
+      .withIndex("by_organization_id", (q) =>
         q.eq("organizationId", args.organizationId),
       )
       .unique();
@@ -125,7 +149,8 @@ export const create = mutation({
       userId: args.organizationId,
     });
 
-    const greetMessage = widgetSettings?.greetMessage || "Hello, how can I help you today?";
+    const greetMessage =
+      widgetSettings?.greetMessage || "Hello, how can I help you today?";
 
     await saveMessage(ctx, components.agent, {
       threadId,

@@ -78,6 +78,24 @@ export async function orchestrateConversationTurn(
 
   // 2. Input Moderation
   const moderation = ModerationPipeline.moderateInput(request.prompt);
+  if (
+    moderation.flagged &&
+    (moderation.riskLevel === "critical" || moderation.riskLevel === "high")
+  ) {
+    return {
+      executionId: `blocked_${traceId}`,
+      status: "completed",
+      responseMessage:
+        "I cannot process that request because it conflicts with our safety policies. Please rephrase your question about your account or our services.",
+      routingCategory: "greeting",
+      evidenceCitations: [],
+      totalLatencyMs: Date.now() - startTime,
+      totalTokensUsed: 0,
+      escalatedToHuman: false,
+      resolved: false,
+      plan: OrchestrationPlanner.createPlan("greeting", ""),
+    };
+  }
   const cleanPrompt = moderation.sanitizedText;
 
   // 3. Customer Long-Term Memory Retrieval

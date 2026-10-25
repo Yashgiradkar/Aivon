@@ -30,7 +30,7 @@ import { chatBubbleIcon, closeIcon } from './icons';
   }
   
   // Exit if no organization ID
-  if (!organizationId) {
+  if (!organizationId || !/^[A-Za-z0-9_-]{1,128}$/.test(organizationId)) {
     console.error('Echo Widget: data-organization-id attribute is required');
     return;
   }

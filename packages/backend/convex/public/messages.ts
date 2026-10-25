@@ -3,16 +3,15 @@ import { action, query } from "../_generated/server";
 import { components, internal } from "../_generated/api";
 import { supportAgent } from "../system/ai/agents/supportAgent";
 import { paginationOptsValidator } from "convex/server";
-import { escalateConversation } from "../system/ai/tools/escalateConversation";
-import { resolveConversation } from "../system/ai/tools/resolveConversation";
 import { saveMessage } from "@convex-dev/agent";
-import { search } from "../system/ai/tools/search";
-import { sanitizeUserInput, validateAgentOutput, checkRateLimit, ModerationPipeline } from "../system/ai/security";
-import { logAIOperation } from "../system/ai/observability";
-import { estimateTokens } from "../system/ai/context";
-import { MemoryManagerLogic } from "../system/ai/memory/memoryManager";
-import { SemanticCacheLogic } from "../system/ai/cache/semanticCache";
+import { ModerationPipeline } from "../system/ai/security";
 import { orchestrateConversationTurn } from "../system/ai/orchestration";
+import {
+  isConfiguredDemoOrganization,
+  MAX_PROMPT_LENGTH,
+  SESSION_MESSAGE_MAX_REQUESTS,
+  SESSION_MESSAGE_WINDOW_MS,
+} from "../lib/requestSecurity";
 
 export const create = action({
   args: {
@@ -25,7 +24,7 @@ export const create = action({
       internal.system.contactSessions.getOne,
       {
         contactSessionId: args.contactSessionId,
-      }
+      },
     );
 
     if (!contactSession || contactSession.expiresAt < Date.now()) {
@@ -49,6 +48,16 @@ export const create = action({
       });
     }
 
+    if (
+      conversation.contactSessionId !== contactSession._id ||
+      conversation.organizationId !== contactSession.organizationId
+    ) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Incorrect session",
+      });
+    }
+
     if (conversation.status === "resolved") {
       throw new ConvexError({
         code: "BAD_REQUEST",
@@ -61,7 +70,7 @@ export const create = action({
       internal.system.widgetSettings.getByOrganizationId,
       {
         organizationId: conversation.organizationId,
-      }
+      },
     );
 
     const maxMessages =
@@ -70,37 +79,45 @@ export const create = action({
         ? widgetSettings.maxMessagesPerConversation
         : 20;
 
-    try {
-      const existingMessages = await supportAgent.listMessages(ctx, {
-        threadId: args.threadId,
-        paginationOpts: { numItems: maxMessages + 1, cursor: null },
+    const existingMessages = await supportAgent.listMessages(ctx, {
+      threadId: args.threadId,
+      paginationOpts: { numItems: maxMessages + 1, cursor: null },
+    });
+    if (existingMessages.page.length >= maxMessages) {
+      throw new ConvexError({
+        code: "LIMIT_REACHED",
+        message: `Conversation limit reached (${maxMessages}/${maxMessages} messages). Please request a callback or contact a specialist.`,
       });
-      if (existingMessages.page.length >= maxMessages) {
-        throw new ConvexError({
-          code: "LIMIT_REACHED",
-          message: `Conversation limit reached (${maxMessages}/${maxMessages} messages). Please request a callback or contact a specialist.`,
-        });
-      }
-    } catch (err) {
-      if (err instanceof ConvexError) throw err;
     }
 
-    // Rate limiting per contact session to prevent runaway loops or denial of service
-    const sessionRateLimit = checkRateLimit(args.contactSessionId, 30, 60000);
-    if (!sessionRateLimit.isAllowed) {
+    const sessionRateLimit = await ctx.runMutation(
+      internal.system.rateLimits.checkKeyedWindow,
+      {
+        key: `session_messages:${args.contactSessionId}`,
+        maxRequests: SESSION_MESSAGE_MAX_REQUESTS,
+        windowMs: SESSION_MESSAGE_WINDOW_MS,
+      },
+    );
+    if (!sessionRateLimit.allowed) {
       throw new ConvexError({
         code: "RATE_LIMITED",
-        message: "You are sending messages too quickly. Please wait a few seconds before trying again.",
+        message:
+          "You are sending messages too quickly. Please wait a few seconds before trying again.",
       });
     }
 
     // Tenant-level distributed rate limit admission (Free / Pro / Enterprise)
-    const tenantAdmission = await ctx.runMutation(internal.system.rateLimits.checkAndAdmit, {
-      organizationId: conversation.organizationId,
-      estimatedTokens: 600,
-    });
+    const tenantAdmission = await ctx.runMutation(
+      internal.system.rateLimits.checkAndAdmit,
+      {
+        organizationId: conversation.organizationId,
+        estimatedTokens: 600,
+      },
+    );
     if (!tenantAdmission.allowed) {
-      const quotaExceeded = "reason" in tenantAdmission && tenantAdmission.reason === "QUOTA_EXHAUSTED";
+      const quotaExceeded =
+        "reason" in tenantAdmission &&
+        tenantAdmission.reason === "QUOTA_EXHAUSTED";
       throw new ConvexError({
         code: quotaExceeded ? "QUOTA_EXHAUSTED" : "RATE_LIMITED",
         message: quotaExceeded
@@ -109,12 +126,23 @@ export const create = action({
       });
     }
 
-    // Multi-stage input moderation
-    const moderation = ModerationPipeline.moderateInput(args.prompt);
-    if (moderation.flagged && moderation.riskLevel === "critical") {
+    if (args.prompt.length > MAX_PROMPT_LENGTH) {
       throw new ConvexError({
         code: "BAD_REQUEST",
-        message: "Your message violates safety guidelines and cannot be processed.",
+        message: "Message exceeds the maximum allowed length",
+      });
+    }
+
+    // Multi-stage input moderation
+    const moderation = ModerationPipeline.moderateInput(args.prompt);
+    if (
+      moderation.flagged &&
+      (moderation.riskLevel === "critical" || moderation.riskLevel === "high")
+    ) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message:
+          "Your message violates safety guidelines and cannot be processed.",
       });
     }
 
@@ -130,17 +158,18 @@ export const create = action({
       },
     );
 
-    const isDemo = conversation.organizationId.toLowerCase().includes("demo");
-    const isSubscribed = subscription?.status === "active" || isDemo;
+    const isSubscribed =
+      subscription?.status === "active" ||
+      isConfiguredDemoOrganization(conversation.organizationId);
 
     const shouldTriggerAgent =
       conversation.status === "unresolved" && isSubscribed;
 
-    const startTime = Date.now();
     const cleanPrompt = moderation.sanitizedText;
 
     // Fetch active long-term memories for this customer
-    const customerIdentifier = contactSession.email || String(args.contactSessionId);
+    const customerIdentifier =
+      contactSession.email || String(args.contactSessionId);
     let promptForAgent = cleanPrompt;
 
     if (shouldTriggerAgent) {
@@ -213,6 +242,17 @@ export const getMany = query({
       throw new ConvexError({
         code: "UNAUTHORIZED",
         message: "Invalid session",
+      });
+    }
+
+    const conversation = await ctx.db
+      .query("conversations")
+      .withIndex("by_thread_id", (q) => q.eq("threadId", args.threadId))
+      .unique();
+    if (!conversation || conversation.contactSessionId !== contactSession._id) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Incorrect session",
       });
     }
 

@@ -7,6 +7,7 @@ import {
   detectQueryIntent,
   type UnifiedSearchResult,
 } from "../rag/unifiedSearch";
+import { ModerationPipeline } from "../security";
 
 export type { EvidenceItem, UnifiedSearchResult };
 export { detectQueryIntent };
@@ -20,6 +21,14 @@ export const search = createTool({
       .describe("The search query to find relevant information in the knowledge base"),
   }),
   handler: async (ctx, args) => {
+    const authorization = ModerationPipeline.authorizeToolCall({
+      toolName: "search",
+      arguments: { query: args.query },
+    });
+    if (!authorization.allowed) {
+      return authorization.reason ?? "Search is not permitted";
+    }
+
     if (!ctx.threadId) {
       return "Missing thread ID";
     }

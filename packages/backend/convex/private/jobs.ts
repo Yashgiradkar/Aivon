@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../_generated/server";
+import { MAX_JOB_LIST_LIMIT } from "../lib/requestSecurity";
 
 export const listTenantJobs = query({
   args: {
@@ -29,7 +30,7 @@ export const listTenantJobs = query({
       });
     }
 
-    const limit = args.limit ?? 25;
+    const limit = Math.min(Math.max(args.limit ?? 25, 1), MAX_JOB_LIST_LIMIT);
 
     if (args.status) {
       return await ctx.db

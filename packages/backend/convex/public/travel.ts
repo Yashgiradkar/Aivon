@@ -1,9 +1,25 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../_generated/server";
+import { internal } from "../_generated/api";
 import { TravelWorkflowManager } from "../system/ai/travel/workflow";
 import { travelProvider } from "../system/ai/travel/provider";
 import { SUPPORTED_LOCATIONS } from "../system/ai/travel/normalizer";
 import { TravelOption, TravelSlots, TravelWorkflowState } from "../system/ai/travel/types";
+import {
+  countEventsInWindow,
+  generateUnpredictableToken,
+  isBoundedIdempotencyKey,
+  isConfiguredTravelOrganization,
+  MAX_PASSENGERS,
+  MAX_SPOKEN_TURN_LENGTH,
+  TRAVEL_SESSION_CREATE_MAX,
+  TRAVEL_SESSION_CREATE_WINDOW_MS,
+  TRAVEL_TURN_MAX_REQUESTS,
+  TRAVEL_TURN_WINDOW_MS,
+} from "../lib/requestSecurity";
+import { sanitizeUserInput } from "../system/ai/security";
+
+const TRAVEL_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
 export const getAvailableLocations = query({
   args: {},
@@ -21,10 +37,15 @@ export const getSession = query({
     sessionToken: v.string(),
   },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const session = await ctx.db
       .query("travelSessions")
       .withIndex("by_session_token", (q) => q.eq("sessionToken", args.sessionToken))
       .first();
+    if (!session) return null;
+    if (Date.now() - session.lastActiveAt > TRAVEL_SESSION_TTL_MS) {
+      return null;
+    }
+    return session;
   },
 });
 
@@ -36,27 +57,66 @@ export const createOrGetSession = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    const token =
-      args.sessionToken ||
-      `ts_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
-    // Try finding existing session
-    const existing = await ctx.db
-      .query("travelSessions")
-      .withIndex("by_session_token", (q) => q.eq("sessionToken", token))
-      .first();
-
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        lastActiveAt: now,
-        updatedAt: now,
+    const organizationId = args.organizationId.trim();
+    if (!isConfiguredTravelOrganization(organizationId)) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Invalid organization",
       });
-      return existing;
     }
 
-    // Create fresh travel session
+    if (args.sessionToken) {
+      const existing = await ctx.db
+        .query("travelSessions")
+        .withIndex("by_session_token", (q) =>
+          q.eq("sessionToken", args.sessionToken!),
+        )
+        .first();
+
+      if (existing) {
+        if (existing.organizationId !== organizationId) {
+          throw new ConvexError({
+            code: "UNAUTHORIZED",
+            message: "Incorrect travel session",
+          });
+        }
+        if (now - existing.lastActiveAt > TRAVEL_SESSION_TTL_MS) {
+          throw new ConvexError({
+            code: "UNAUTHORIZED",
+            message: "Travel session expired",
+          });
+        }
+        await ctx.db.patch(existing._id, {
+          lastActiveAt: now,
+          updatedAt: now,
+        });
+        return existing;
+      }
+    }
+
+    const recentSessions = await ctx.db
+      .query("travelSessions")
+      .withIndex("by_organization_id", (q) =>
+        q.eq("organizationId", organizationId),
+      )
+      .order("desc")
+      .take(TRAVEL_SESSION_CREATE_MAX);
+    if (
+      countEventsInWindow(
+        recentSessions.map((session) => session.createdAt),
+        now,
+        TRAVEL_SESSION_CREATE_WINDOW_MS,
+      ) >= TRAVEL_SESSION_CREATE_MAX
+    ) {
+      throw new ConvexError({
+        code: "RATE_LIMITED",
+        message: "Too many travel sessions. Please wait and try again.",
+      });
+    }
+
+    const token = generateUnpredictableToken("ts");
     const newSessionId = await ctx.db.insert("travelSessions", {
-      organizationId: args.organizationId,
+      organizationId,
       sessionToken: token,
       contactSessionId: args.contactSessionId,
       status: "GREETING",
@@ -91,16 +151,48 @@ export const processSpokenTurn = mutation({
       });
     }
 
-    const availableOptions: TravelOption[] = session.searchResults
-      ? JSON.parse(session.searchResults)
-      : [];
-    const selectedOption: TravelOption | undefined = session.selectedOption
-      ? JSON.parse(session.selectedOption)
-      : undefined;
+    if (now - session.lastActiveAt > TRAVEL_SESSION_TTL_MS) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Travel session expired",
+      });
+    }
+
+    const turnLimit = await ctx.runMutation(
+      internal.system.rateLimits.checkKeyedWindow,
+      {
+        key: `travel_turn:${session._id}`,
+        maxRequests: TRAVEL_TURN_MAX_REQUESTS,
+        windowMs: TRAVEL_TURN_WINDOW_MS,
+      },
+    );
+    if (!turnLimit.allowed) {
+      throw new ConvexError({
+        code: "RATE_LIMITED",
+        message: "Too many travel requests. Please wait and try again.",
+      });
+    }
+
+    const spoken = sanitizeUserInput(args.spokenText, MAX_SPOKEN_TURN_LENGTH);
+    if (!spoken.sanitizedText) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Spoken text is required",
+      });
+    }
+
+    const availableOptions: TravelOption[] = parseJsonField(
+      session.searchResults,
+      [],
+    );
+    const selectedOption: TravelOption | undefined = parseJsonField(
+      session.selectedOption,
+      undefined,
+    );
 
     // Process turn through multi-turn workflow
     const turnResult = await TravelWorkflowManager.processTurn({
-      spokenText: args.spokenText,
+      spokenText: spoken.sanitizedText,
       currentState: session.status as TravelWorkflowState,
       currentSlots: session.extractedSlots as TravelSlots,
       availableOptions,
@@ -115,7 +207,7 @@ export const processSpokenTurn = mutation({
       searchResults: turnResult.options ? JSON.stringify(turnResult.options) : session.searchResults,
       selectedOption: turnResult.selectedOption ? JSON.stringify(turnResult.selectedOption) : session.selectedOption,
       confirmationRequired: turnResult.confirmationRequired,
-      lastSpokenTurn: args.spokenText,
+      lastSpokenTurn: spoken.sanitizedText,
       lastActiveAt: now,
       updatedAt: now,
     });
@@ -176,12 +268,70 @@ export const confirmBooking = mutation({
       });
     }
 
-    const selectedOption: TravelOption = JSON.parse(session.selectedOption);
+    if (now - session.lastActiveAt > TRAVEL_SESSION_TTL_MS) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Travel session expired",
+      });
+    }
 
-    // 2. Check if already booked with this idempotency key
+    const bookingLimit = await ctx.runMutation(
+      internal.system.rateLimits.checkKeyedWindow,
+      {
+        key: `travel_booking:${session._id}`,
+        maxRequests: 5,
+        windowMs: TRAVEL_TURN_WINDOW_MS,
+      },
+    );
+    if (!bookingLimit.allowed) {
+      throw new ConvexError({
+        code: "RATE_LIMITED",
+        message: "Too many booking attempts. Please wait and try again.",
+      });
+    }
+
+    if (!isBoundedIdempotencyKey(args.idempotencyKey)) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Idempotency key is invalid",
+      });
+    }
+
+    if (
+      args.passengers.length === 0 ||
+      args.passengers.length > MAX_PASSENGERS ||
+      args.passengers.some(
+        (passenger) =>
+          !passenger.name.trim() ||
+          passenger.name.trim().length > 80 ||
+          passenger.age < 0 ||
+          passenger.age > 120 ||
+          passenger.gender.trim().length > 32,
+      )
+    ) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Passenger details are invalid",
+      });
+    }
+
+    const selectedOption = parseJsonField<TravelOption | undefined>(
+      session.selectedOption,
+      undefined,
+    );
+    if (!selectedOption) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "No travel option has been selected for booking.",
+      });
+    }
+
+    const tenantIdempotencyKey = `${session.organizationId}:${args.idempotencyKey}`;
+
+    // 2. Check if already booked with this idempotency key for this tenant
     const existingBooking = await ctx.db
       .query("travelBookings")
-      .withIndex("by_idempotency_key", (q) => q.eq("idempotencyKey", args.idempotencyKey))
+      .withIndex("by_idempotency_key", (q) => q.eq("idempotencyKey", tenantIdempotencyKey))
       .first();
 
     if (existingBooking) {
@@ -202,7 +352,7 @@ export const confirmBooking = mutation({
       travelSessionId: session._id,
       optionId: selectedOption.id,
       passengers: args.passengers,
-      idempotencyKey: args.idempotencyKey,
+      idempotencyKey: tenantIdempotencyKey,
       confirmedByCustomer: true,
     });
 
@@ -238,7 +388,7 @@ export const confirmBooking = mutation({
         status: "CONFIRMED",
       })),
       status: "confirmed",
-      idempotencyKey: args.idempotencyKey,
+      idempotencyKey: tenantIdempotencyKey,
       createdAt: now,
       updatedAt: now,
     });
@@ -278,3 +428,12 @@ export const cancelSession = mutation({
     return { success: true };
   },
 });
+
+function parseJsonField<T>(raw: string | undefined, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}

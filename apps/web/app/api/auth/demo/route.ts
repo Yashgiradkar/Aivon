@@ -1,69 +1,59 @@
 import { NextResponse } from "next/server";
 
+const demoAttempts = new Map<string, number[]>();
+
+function isRateLimited(key: string): boolean {
+  const now = Date.now();
+  const windowMs = 60_000;
+  const recent = (demoAttempts.get(key) ?? []).filter((ts) => now - ts < windowMs);
+  if (recent.length >= 5) {
+    demoAttempts.set(key, recent);
+    return true;
+  }
+  recent.push(now);
+  demoAttempts.set(key, recent);
+  return false;
+}
+
 export async function POST(req: Request) {
+  if (process.env.DEMO_AUTH_ENABLED !== "true") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const clientKey =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
+  if (isRateLimited(clientKey)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const clerkSecretKey = process.env.CLERK_SECRET_KEY;
-    if (!clerkSecretKey) {
-      return NextResponse.json(
-        { error: "Clerk secret key not configured on server" },
-        { status: 500 }
-      );
+    const demoUserEmail = process.env.DEMO_USER_EMAIL?.trim().toLowerCase();
+    const demoOrganizationId = process.env.DEMO_ORGANIZATION_ID?.trim();
+    if (!clerkSecretKey || !demoUserEmail || !demoOrganizationId) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    // 1. Look for existing demo user or fetch first matching demo user
-    const usersRes = await fetch("https://api.clerk.com/v1/users?limit=10", {
-      headers: {
-        Authorization: `Bearer ${clerkSecretKey}`,
-        "Content-Type": "application/json",
+    const usersRes = await fetch(
+      `https://api.clerk.com/v1/users?email_address=${encodeURIComponent(demoUserEmail)}&limit=1`,
+      {
+        headers: {
+          Authorization: `Bearer ${clerkSecretKey}`,
+          "Content-Type": "application/json",
+        },
       },
-    });
+    );
 
     if (!usersRes.ok) {
-      throw new Error(`Failed to list users from Clerk: ${usersRes.statusText}`);
+      return NextResponse.json({ error: "Demo unavailable" }, { status: 503 });
     }
 
     const users = await usersRes.json();
-    let demoUser = users.find((u: any) =>
-      u.email_addresses?.some((e: any) =>
-        e.email_address?.toLowerCase().includes("demo")
-      )
-    );
-
-    // If no demo user found, pick the first user or create one
-    if (!demoUser && users.length > 0) {
-      demoUser = users[0];
+    const demoUser = Array.isArray(users) ? users[0] : users?.data?.[0];
+    if (!demoUser?.id) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    if (!demoUser) {
-      return NextResponse.json(
-        { error: "Demo user not found in Clerk" },
-        { status: 404 }
-      );
-    }
-
-    // 2. Fetch or find demo organization
-    const orgsRes = await fetch("https://api.clerk.com/v1/organizations?limit=10", {
-      headers: {
-        Authorization: `Bearer ${clerkSecretKey}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-    let demoOrgId: string | null = null;
-    if (orgsRes.ok) {
-      const orgsData = await orgsRes.json();
-      const orgs = orgsData.data || orgsData;
-      const demoOrg = orgs.find((o: any) =>
-        o.name?.toLowerCase().includes("demo")
-      );
-      if (demoOrg) {
-        demoOrgId = demoOrg.id;
-      } else if (orgs.length > 0) {
-        demoOrgId = orgs[0].id;
-      }
-    }
-
-    // 3. Create a single-use Sign-In Token (ticket) for the demo user (valid 5 minutes)
     const tokenRes = await fetch("https://api.clerk.com/v1/sign_in_tokens", {
       method: "POST",
       headers: {
@@ -77,23 +67,16 @@ export async function POST(req: Request) {
     });
 
     if (!tokenRes.ok) {
-      const errorDetails = await tokenRes.text();
-      throw new Error(`Failed to create sign-in token: ${errorDetails}`);
+      return NextResponse.json({ error: "Demo unavailable" }, { status: 503 });
     }
 
     const tokenData = await tokenRes.json();
-
     return NextResponse.json({
       success: true,
       ticket: tokenData.token,
-      organizationId: demoOrgId,
-      userId: demoUser.id,
+      organizationId: demoOrganizationId,
     });
-  } catch (error: any) {
-    console.error("[Demo Auth API] Error:", error);
-    return NextResponse.json(
-      { error: error?.message || "Failed to initialize demo session" },
-      { status: 500 }
-    );
+  } catch {
+    return NextResponse.json({ error: "Demo unavailable" }, { status: 503 });
   }
 }

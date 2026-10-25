@@ -1,3 +1,11 @@
+import { sanitizeUserInput } from "./sanitizer";
+
+const ALLOWED_TOOLS = new Set([
+  "search",
+  "escalateConversation",
+  "resolveConversation",
+]);
+
 /**
  * Multi-Stage Defense-in-Depth Moderation & Safety Pipeline
  *
@@ -61,7 +69,9 @@ export class ModerationPipeline {
    * Evaluates untrusted customer input for harmful content and prompt injection.
    */
   public static moderateInput(rawInput: string): ModerationResult {
-    if (!rawInput || typeof rawInput !== "string") {
+    const cleaned = sanitizeUserInput(rawInput);
+    const text = cleaned.sanitizedText;
+    if (!text) {
       return { flagged: false, categories: [], riskLevel: "low", sanitizedText: "" };
     }
 
@@ -70,7 +80,7 @@ export class ModerationPipeline {
 
     // 1. Harmful content check
     for (const pattern of this.TOXIC_PATTERNS) {
-      if (pattern.test(rawInput)) {
+      if (pattern.test(text)) {
         categories.push("violence");
         riskLevel = "critical";
       }
@@ -87,10 +97,15 @@ export class ModerationPipeline {
     ];
 
     for (const pattern of injectionPatterns) {
-      if (pattern.test(rawInput)) {
+      if (pattern.test(text)) {
         categories.push("prompt_injection");
         if (riskLevel !== "critical") riskLevel = "high";
       }
+    }
+
+    if (cleaned.isSuspicious && !categories.includes("prompt_injection")) {
+      categories.push("prompt_injection");
+      if (riskLevel !== "critical") riskLevel = "high";
     }
 
     const flagged = categories.length > 0;
@@ -101,7 +116,7 @@ export class ModerationPipeline {
       rejectionReason: flagged
         ? `Request flagged by safety policy: ${categories.join(", ")}`
         : undefined,
-      sanitizedText: rawInput.trim(),
+      sanitizedText: text,
     };
   }
 
@@ -118,7 +133,10 @@ export class ModerationPipeline {
     for (const pattern of this.INDIRECT_INJECTION_PATTERNS) {
       if (pattern.test(sanitized)) {
         indirectInjectionFound = true;
-        sanitized = sanitized.replace(pattern, "[MALICIOUS_INSTRUCTION_REDACTED]");
+        sanitized = sanitized.replace(
+          new RegExp(pattern.source, `${pattern.flags.includes("i") ? "i" : ""}g`),
+          "[MALICIOUS_INSTRUCTION_REDACTED]",
+        );
       }
     }
 
@@ -133,8 +151,8 @@ export class ModerationPipeline {
     const { toolName, arguments: args } = toolCall;
 
     // Fail closed on unknown or empty tool names
-    if (!toolName) {
-      return { allowed: false, reason: "Tool name is required" };
+    if (!toolName || !ALLOWED_TOOLS.has(toolName)) {
+      return { allowed: false, reason: "Tool is not authorized" };
     }
 
     // Escalation tool verification

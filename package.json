@@ -1,33 +1,43 @@
 {
-	"name": "Aivon-monorepo",
-	"version": "0.0.1",
-	"private": true,
-	"scripts": {
-		"build": "turbo build",
-		"dev": "turbo dev",
-		"lint": "turbo lint",
-		"test": "tsx eval/tests/securityAndGuardrails.test.ts && tsx eval/tests/contextAndRouting.test.ts && tsx eval/tests/multiFormatRagAndJudge.test.ts && tsx eval/tests/voiceAndElevenLabs.test.ts && tsx eval/tests/hybridRagAndBM25.test.ts && tsx eval/tests/policyIdentifier.test.ts && tsx eval/tests/queueWorkflow.test.ts && tsx eval/tests/endToEndAccuracy.test.ts && tsx eval/tests/rateLimiting.test.ts && tsx eval/tests/memoryLifecycle.test.ts && tsx eval/tests/semanticCache.test.ts && tsx eval/tests/backgroundJobs.test.ts && tsx eval/tests/redTeamSafety.test.ts && tsx eval/tests/ragasAndDeepEval.test.ts && tsx eval/tests/orchestration.test.ts && tsx eval/tests/travelNormalizer.test.ts && tsx eval/tests/travelWorkflow.test.ts",
-		"test:travel": "tsx eval/tests/travelNormalizer.test.ts && tsx eval/tests/travelWorkflow.test.ts",
-		"test:orchestration": "tsx eval/tests/orchestration.test.ts",
-		"test:infra": "tsx eval/tests/rateLimiting.test.ts && tsx eval/tests/memoryLifecycle.test.ts && tsx eval/tests/semanticCache.test.ts && tsx eval/tests/backgroundJobs.test.ts && tsx eval/tests/redTeamSafety.test.ts && tsx eval/tests/ragasAndDeepEval.test.ts",
-		"test:queue": "tsx eval/tests/queueWorkflow.test.ts",
-		"test:policy": "tsx eval/tests/policyIdentifier.test.ts",
-		"test:accuracy": "tsx eval/tests/endToEndAccuracy.test.ts",
-		"eval": "tsx eval/runEval.ts",
-
-		"format": "prettier --write \"**/*.{ts,tsx,md}\""
-	},
-
-	"devDependencies": {
-		"@workspace/eslint-config": "workspace:*",
-		"@workspace/typescript-config": "workspace:*",
-		"prettier": "^3.5.1",
-		"tsx": "^4.23.15",
-		"turbo": "^2.4.2",
-		"typescript": "5.7.3"
-	},
-	"packageManager": "pnpm@10.4.1",
-	"engines": {
-		"node": ">=20"
-	}
+  "name": "Aivon-monorepo",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "test": "tsx eval/tests/securityAndGuardrails.test.ts && tsx eval/tests/contextAndRouting.test.ts && tsx eval/tests/multiFormatRagAndJudge.test.ts && tsx eval/tests/voiceAndElevenLabs.test.ts && tsx eval/tests/hybridRagAndBM25.test.ts && tsx eval/tests/policyIdentifier.test.ts && tsx eval/tests/queueWorkflow.test.ts && tsx eval/tests/endToEndAccuracy.test.ts && tsx eval/tests/rateLimiting.test.ts && tsx eval/tests/memoryLifecycle.test.ts && tsx eval/tests/semanticCache.test.ts && tsx eval/tests/backgroundJobs.test.ts && tsx eval/tests/redTeamSafety.test.ts && tsx eval/tests/ragasAndDeepEval.test.ts && tsx eval/tests/orchestration.test.ts && tsx eval/tests/travelNormalizer.test.ts && tsx eval/tests/travelWorkflow.test.ts",
+    "test:travel": "tsx eval/tests/travelNormalizer.test.ts && tsx eval/tests/travelWorkflow.test.ts",
+    "test:orchestration": "tsx eval/tests/orchestration.test.ts",
+    "test:infra": "tsx eval/tests/rateLimiting.test.ts && tsx eval/tests/memoryLifecycle.test.ts && tsx eval/tests/semanticCache.test.ts && tsx eval/tests/backgroundJobs.test.ts && tsx eval/tests/redTeamSafety.test.ts && tsx eval/tests/ragasAndDeepEval.test.ts",
+    "test:queue": "tsx eval/tests/queueWorkflow.test.ts",
+    "test:policy": "tsx eval/tests/policyIdentifier.test.ts",
+    "test:accuracy": "tsx eval/tests/endToEndAccuracy.test.ts",
+    "eval": "tsx eval/runEval.ts",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+  },
+  "devDependencies": {
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/typescript-config": "workspace:*",
+    "prettier": "^3.5.1",
+    "tsx": "^4.23.15",
+    "turbo": "^2.4.2",
+    "typescript": "5.7.3"
+  },
+  "packageManager": "pnpm@10.4.1",
+  "pnpm": {
+    "overrides": {
+      "postcss": "8.5.23",
+      "source-map-js": "1.2.2",
+      "jsondiffpatch": "0.7.6",
+      "js-yaml": "4.3.2",
+      "launch-editor": "6.4.4",
+      "vite": "6.4.4",
+      "brace-expansion@1.1.18": "1.1.21",
+      "brace-expansion@5.0.9": "5.0.12"
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  }
 }

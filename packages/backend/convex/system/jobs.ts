@@ -1,9 +1,13 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery, internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { JobRunnerLogic } from "./jobs/jobRunner";
 import { MemoryManagerLogic } from "./ai/memory/memoryManager";
 import { Id } from "../_generated/dataModel";
+import {
+  isSafeOrganizationId,
+  MAX_JOB_PAYLOAD_LENGTH,
+} from "../lib/requestSecurity";
 
 // ---------------------------------------------------------------------------
 // Enqueue a durable background job (with idempotency and duplicate checking)
@@ -24,6 +28,16 @@ export const enqueueJob = internalMutation({
     delayMs: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    if (
+      !isSafeOrganizationId(args.organizationId) ||
+      args.payload.length > MAX_JOB_PAYLOAD_LENGTH
+    ) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Job payload is invalid",
+      });
+    }
+
     const now = Date.now();
     const idKey = args.idempotencyKey ?? `job_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const maxAttempts = args.maxAttempts ?? JobRunnerLogic.DEFAULT_MAX_ATTEMPTS;

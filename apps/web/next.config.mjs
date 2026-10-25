@@ -29,14 +29,43 @@ const nextConfig = {
     ];
   },
   async headers() {
-    const clerkUrl = process.env.NEXT_PUBLIC_CLERK_FRONTEND_API_URL || "https://clerk.accounts.dev";
+    const clerkUrl =
+      process.env.NEXT_PUBLIC_CLERK_FRONTEND_API_URL ||
+      "https://clerk.accounts.dev";
     return [
       {
         source: "/:path*",
         headers: [
           {
             key: "X-DNS-Prefetch-Control",
-            value: "on",
+            value: "off",
+          },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+          { key: "X-Frame-Options", value: "DENY" },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${clerkUrl} https://*.clerk.accounts.dev https://challenges.cloudflare.com`,
+              `connect-src 'self' ${clerkUrl} https://*.clerk.accounts.dev ${process.env.NEXT_PUBLIC_CONVEX_URL ?? ""} https://*.convex.cloud https://*.convex.site wss://*.convex.cloud https://*.sentry.io`,
+              "img-src 'self' data: blob: https:",
+              "style-src 'self' 'unsafe-inline'",
+              "font-src 'self' data:",
+              `frame-src ${clerkUrl} https://*.clerk.accounts.dev https://challenges.cloudflare.com`,
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "object-src 'none'",
+            ].join("; "),
           },
           {
             key: "Link",
@@ -92,5 +121,5 @@ export default withSentryConfig(nextConfig, {
       // Automatically tree-shake Sentry logger statements to reduce bundle size
       removeDebugLogging: true,
     },
-  }
+  },
 });

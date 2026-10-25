@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../_generated/server";
+import { isConfiguredDemoActor } from "../lib/requestSecurity";
 
 export const remove = mutation({
   args: {
@@ -24,7 +25,7 @@ export const remove = mutation({
       });
     }
 
-    if (identity.email?.toLowerCase().includes("demo") || orgId.toLowerCase().includes("demo")) {
+    if (isConfiguredDemoActor(identity)) {
       throw new ConvexError({
         code: "FORBIDDEN",
         message: "Disconnecting plugins is disabled in Demo Mode.",

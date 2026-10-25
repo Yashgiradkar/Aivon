@@ -1,13 +1,22 @@
 import { createTool } from "@convex-dev/agent";
 import z from "zod";
 import { internal } from "../../../_generated/api";
+import { ModerationPipeline } from "../security";
 
 export const escalateConversation = createTool({
   description: "Escalate a conversation to human support team",
   args: z.object({
     reason: z.string().optional().describe("The reason for escalating the conversation"),
   }),
-  handler: async (ctx, _args) => {
+  handler: async (ctx, args) => {
+    const authorization = ModerationPipeline.authorizeToolCall({
+      toolName: "escalateConversation",
+      arguments: { reason: args.reason },
+    });
+    if (!authorization.allowed) {
+      return authorization.reason ?? "Escalation is not permitted";
+    }
+
     if (!ctx.threadId) {
       return "Missing thread ID. Unable to escalate.";
     }

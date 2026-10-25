@@ -1,6 +1,10 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { paginationOptsValidator } from "convex/server";
+import {
+  assertBoundedText,
+  MAX_HUMAN_REVIEW_NOTES_LENGTH,
+} from "../lib/requestSecurity";
 
 export const list = query({
   args: {
@@ -33,7 +37,12 @@ export const list = query({
 
     let filteredPage = paginated.page;
 
-    if (args.status) {
+    if (
+      args.status &&
+      (args.status === "pending" ||
+        args.status === "completed" ||
+        args.status === "failed")
+    ) {
       filteredPage = filteredPage.filter((e) => e.status === args.status);
     }
 
@@ -158,7 +167,13 @@ export const submitHumanReview = mutation({
 
     await ctx.db.patch(args.evaluationId, {
       humanReviewStatus: args.status,
-      humanReviewNotes: args.notes,
+      humanReviewNotes: args.notes
+        ? assertBoundedText(
+            args.notes,
+            MAX_HUMAN_REVIEW_NOTES_LENGTH,
+            "Review notes",
+          )
+        : undefined,
       humanReviewedBy: identity.name || identity.email || "Operator",
       humanReviewedAt: Date.now(),
     });

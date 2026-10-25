@@ -33,40 +33,40 @@ The system's AI layer is orchestrated by a **multi-agent orchestration engine** 
 
 ## Tech Stack
 
-| Category | Technology |
-|---|---|
-| **Monorepo Tooling** | [Turborepo](https://turbo.build/) v2, [pnpm](https://pnpm.io/) v10 Workspaces |
-| **Frontend — Dashboard** | [Next.js](https://nextjs.org/) v15 (App Router), React v19, TypeScript 5.7 |
-| **Frontend — Widget** | Next.js v15 (Turbopack), React v19, TypeScript 5.7 |
-| **Frontend — Embed Script** | Vanilla TypeScript, [Vite](https://vitejs.dev/) v5 |
-| **UI Components** | Shared `@workspace/ui` package (Radix-based, shadcn/ui conventions) |
-| **State Management** | [Jotai](https://jotai.org/) v2 |
-| **Forms** | React Hook Form v7 + Zod v3 |
-| **Authentication** | [Clerk](https://clerk.com/) (multi-org, `@clerk/nextjs` v6) |
-| **Backend / Database** | [Convex](https://convex.dev/) v1.25 (real-time serverless DB + functions) |
-| **AI / LLM** | [Vercel AI SDK](https://sdk.vercel.ai/) v4, `@convex-dev/agent` v0.1, OpenAI models |
-| **RAG** | `@convex-dev/rag` v0.3 (vector search over uploaded knowledge-base files) |
-| **Voice Integration** | [Vapi AI](https://vapi.ai/) — `@vapi-ai/web` (client), `@vapi-ai/server-sdk` (backend) |
-| **Secrets Management** | AWS Secrets Manager (`@aws-sdk/client-secrets-manager`) |
-| **Webhook Validation** | [Svix](https://svix.com/) |
-| **Error Monitoring** | [Sentry](https://sentry.io/) (`@sentry/nextjs` v9) |
-| **Styling** | Tailwind CSS v4 (via PostCSS, shared through `@workspace/ui`) |
-| **Linting / Formatting** | ESLint v9, Prettier v3 (shared via `@workspace/eslint-config`) |
+| Category                    | Technology                                                                             |
+| --------------------------- | -------------------------------------------------------------------------------------- |
+| **Monorepo Tooling**        | [Turborepo](https://turbo.build/) v2, [pnpm](https://pnpm.io/) v10 Workspaces          |
+| **Frontend — Dashboard**    | [Next.js](https://nextjs.org/) v15 (App Router), React v19, TypeScript 5.7             |
+| **Frontend — Widget**       | Next.js v15 (Turbopack), React v19, TypeScript 5.7                                     |
+| **Frontend — Embed Script** | Vanilla TypeScript, [Vite](https://vitejs.dev/) v5                                     |
+| **UI Components**           | Shared `@workspace/ui` package (Radix-based, shadcn/ui conventions)                    |
+| **State Management**        | [Jotai](https://jotai.org/) v2                                                         |
+| **Forms**                   | React Hook Form v7 + Zod v3                                                            |
+| **Authentication**          | [Clerk](https://clerk.com/) (multi-org, `@clerk/nextjs` v6)                            |
+| **Backend / Database**      | [Convex](https://convex.dev/) v1.25 (real-time serverless DB + functions)              |
+| **AI / LLM**                | [Vercel AI SDK](https://sdk.vercel.ai/) v4, `@convex-dev/agent` v0.1, OpenAI models    |
+| **RAG**                     | `@convex-dev/rag` v0.3 (vector search over uploaded knowledge-base files)              |
+| **Voice Integration**       | [Vapi AI](https://vapi.ai/) — `@vapi-ai/web` (client), `@vapi-ai/server-sdk` (backend) |
+| **Secrets Management**      | AWS Secrets Manager (`@aws-sdk/client-secrets-manager`)                                |
+| **Webhook Validation**      | [Svix](https://svix.com/)                                                              |
+| **Error Monitoring**        | [Sentry](https://sentry.io/) (`@sentry/nextjs` v9)                                     |
+| **Styling**                 | Tailwind CSS v4 (via PostCSS, shared through `@workspace/ui`)                          |
+| **Linting / Formatting**    | ESLint v9, Prettier v3 (shared via `@workspace/eslint-config`)                         |
 
 ---
 
 ## Prerequisites
 
-| Requirement | Version |
-|---|---|
-| **Node.js** | `>= 20` |
-| **pnpm** | `10.4.1` (set as `packageManager`) |
-| **Convex account** | [convex.dev](https://convex.dev) |
-| **Clerk account** | [clerk.com](https://clerk.com) |
-| **OpenAI API key** | [platform.openai.com](https://platform.openai.com) |
-| **AWS account** | Required for Secrets Manager (Vapi key storage) |
-| **Vapi account** _(optional)_ | [vapi.ai](https://vapi.ai) — for voice support integration |
-| **Sentry account** _(optional)_ | [sentry.io](https://sentry.io) — for error monitoring |
+| Requirement                     | Version                                                    |
+| ------------------------------- | ---------------------------------------------------------- |
+| **Node.js**                     | `>= 20`                                                    |
+| **pnpm**                        | `10.4.1` (set as `packageManager`)                         |
+| **Convex account**              | [convex.dev](https://convex.dev)                           |
+| **Clerk account**               | [clerk.com](https://clerk.com)                             |
+| **OpenAI API key**              | [platform.openai.com](https://platform.openai.com)         |
+| **AWS account**                 | Required for Secrets Manager (Vapi key storage)            |
+| **Vapi account** _(optional)_   | [vapi.ai](https://vapi.ai) — for voice support integration |
+| **Sentry account** _(optional)_ | [sentry.io](https://sentry.io) — for error monitoring      |
 
 ---
 
@@ -93,40 +93,58 @@ Create the following `.env.local` files before running any app.
 
 ### `packages/backend/.env.local`
 
-| Variable | Description |
-|---|---|
-| `CONVEX_DEPLOYMENT` | Your Convex deployment slug (e.g. `dev:your-slug`) |
-| `CONVEX_URL` | Your Convex cloud URL |
-| `CONVEX_SITE_URL` | Your Convex HTTP actions site URL |
-| `CLERK_JWT_ISSUER_DOMAIN` | Clerk JWT issuer URL for token verification |
-| `CLERK_SECRET_KEY` | Clerk backend secret key |
-| `CLERK_WEBHOOK_SECRET` | Svix webhook secret for Clerk events |
-| `OPENAI_API_KEY` | OpenAI API key for the AI support agent |
-| `AWS_ACCESS_KEY_ID` | AWS credentials for Secrets Manager |
-| `AWS_SECRET_ACCESS_KEY` | AWS credentials for Secrets Manager |
-| `AWS_REGION` | AWS region (e.g. `us-east-1`) |
+| Variable                  | Description                                                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CONVEX_DEPLOYMENT`       | Your Convex deployment slug (e.g. `dev:your-slug`)                                                                                                |
+| `CONVEX_URL`              | Your Convex cloud URL                                                                                                                             |
+| `CONVEX_SITE_URL`         | Your Convex HTTP actions site URL                                                                                                                 |
+| `CLERK_JWT_ISSUER_DOMAIN` | Clerk JWT issuer URL for token verification                                                                                                       |
+| `CLERK_SECRET_KEY`        | Clerk backend secret key                                                                                                                          |
+| `CLERK_WEBHOOK_SECRET`    | Svix webhook secret for Clerk events                                                                                                              |
+| `OPENAI_API_KEY`          | OpenAI API key for the AI support agent                                                                                                           |
+| `AWS_ACCESS_KEY_ID`       | AWS credentials for Secrets Manager                                                                                                               |
+| `AWS_SECRET_ACCESS_KEY`   | AWS credentials for Secrets Manager                                                                                                               |
+| `AWS_REGION`              | AWS region (e.g. `us-east-1`)                                                                                                                     |
+| `MALWARE_SCANNER_URL`     | **Required for knowledge-base uploads.** HTTPS endpoint that accepts raw file bytes and returns `{ "clean": true }` only after an antivirus scan. |
+| `MALWARE_SCANNER_TOKEN`   | **Required for knowledge-base uploads.** Bearer token for the malware scanner endpoint.                                                           |
+| `VAPI_WEBHOOK_SECRET`     | **Required when voice webhooks are enabled.** Shared secret sent by Vapi as `x-vapi-secret`; requests are rejected if unset.                      |
 
 ### `apps/web/.env.local`
 
-| Variable | Description |
-|---|---|
-| `NEXT_PUBLIC_CONVEX_URL` | Public Convex URL for the dashboard frontend |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
-| `NEXT_PUBLIC_CLERK_FRONTEND_API_URL` | Clerk frontend API URL |
-| `CLERK_SECRET_KEY` | Clerk secret key (server-side usage) |
-| `NEXT_PUBLIC_CLERK_SIGNIN_URL` | Sign-in page path (e.g. `/sign-in`) |
-| `NEXT_PUBLIC_CLERK_SIGNUP_URL` | Sign-up page path (e.g. `/sign-up`) |
-| `NEXT_PUBLIC_CLERK_SIGNIN_FALLBACK_REDIRECT_URL` | Post-sign-in redirect |
-| `NEXT_PUBLIC_CLERK_SIGNUP_FALLBACK_REDIRECT_URL` | Post-sign-up redirect |
-| `SENTRY_AUTH_TOKEN` | Sentry auth token for source map uploads |
+| Variable                                         | Description                                                                                                           |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_CONVEX_URL`                         | Public Convex URL for the dashboard frontend                                                                          |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`              | Clerk publishable key                                                                                                 |
+| `NEXT_PUBLIC_CLERK_FRONTEND_API_URL`             | Clerk frontend API URL                                                                                                |
+| `CLERK_SECRET_KEY`                               | Clerk secret key (server-side usage)                                                                                  |
+| `NEXT_PUBLIC_CLERK_SIGNIN_URL`                   | Sign-in page path (e.g. `/sign-in`)                                                                                   |
+| `NEXT_PUBLIC_CLERK_SIGNUP_URL`                   | Sign-up page path (e.g. `/sign-up`)                                                                                   |
+| `NEXT_PUBLIC_CLERK_SIGNIN_FALLBACK_REDIRECT_URL` | Post-sign-in redirect                                                                                                 |
+| `NEXT_PUBLIC_CLERK_SIGNUP_FALLBACK_REDIRECT_URL` | Post-sign-up redirect                                                                                                 |
+| `SENTRY_AUTH_TOKEN`                              | Sentry auth token for source map uploads                                                                              |
+| `DEMO_AUTH_ENABLED`                              | Set to `true` only in an isolated demo deployment. The public one-click demo sign-in endpoint is disabled by default. |
 
 ### `apps/widget/.env.local`
 
-| Variable | Description |
-|---|---|
+| Variable                 | Description                               |
+| ------------------------ | ----------------------------------------- |
 | `NEXT_PUBLIC_CONVEX_URL` | Public Convex URL for the widget frontend |
 
 > **Note:** Never commit `.env.local` files. They are already listed in `.gitignore`.
+
+### Knowledge-base upload security
+
+Knowledge-base uploads are validated before Convex storage, text extraction, or RAG indexing. The backend permits only PDF, UTF-8 TXT/CSV/TSV/JSON, PNG, JPEG, and WebP; it validates the filename, extension, size, encoding, file signatures, and basic PDF structure. PDFs with active JavaScript, launch actions, embedded files, or rich media are rejected. Text files are limited to 2 MB; all uploads are limited to 10 MB and PDFs to 200 detected pages.
+
+Uploads fail closed until `MALWARE_SCANNER_URL` and `MALWARE_SCANNER_TOKEN` are configured. The scanner must accept an authenticated `POST` containing the raw bytes and return JSON exactly in the form `{ "clean": true }`. Run the scanner in an isolated service with its own resource limits and current AV signatures. Rejected or unavailable scans are never stored, parsed, or indexed.
+
+The application does not accept archives, HTML, SVG, Office documents, or GIF uploads. Existing documents should be reviewed before enabling the new control, since this validation applies to new uploads only. Parser hardening is defense in depth; the external scanner and isolated deployment remain required operational controls.
+
+Public widget session creation validates and bounds contact data and metadata before persistence. Queue and call state changes that affect agent availability are server-managed; browsers cannot mark calls connected, completed, or failed.
+
+### Dependency-security follow-up
+
+The current Convex Agent/RAG stack uses AI SDK v4, which has a Zod v3 peer dependency. The available upstream remediation for Zod's resource-exhaustion advisory requires Zod v4.6.6 or later and therefore requires a coordinated upgrade to compatible Convex Agent/RAG and AI SDK releases. Do not force a global Zod override before that migration is tested; run `pnpm audit --prod --audit-level high` in CI and prioritize this upgrade.
 
 ---
 
@@ -142,12 +160,12 @@ pnpm dev
 
 This uses Turborepo to start all packages concurrently:
 
-| App | URL | Command |
-|---|---|---|
-| `apps/web` (Dashboard) | `http://localhost:3000` | `next dev --port 3000` |
+| App                         | URL                     | Command                            |
+| --------------------------- | ----------------------- | ---------------------------------- |
+| `apps/web` (Dashboard)      | `http://localhost:3000` | `next dev --port 3000`             |
 | `apps/widget` (Chat Widget) | `http://localhost:3001` | `next dev --turbopack --port 3001` |
-| `apps/embed` (Embed Script) | `http://localhost:3002` | `vite --port 3002` |
-| `packages/backend` (Convex) | Convex Cloud | `convex dev` |
+| `apps/embed` (Embed Script) | `http://localhost:3002` | `vite --port 3002`                 |
+| `packages/backend` (Convex) | Convex Cloud            | `convex dev`                       |
 
 ### Running a single app
 
@@ -184,7 +202,7 @@ The script exposes a global `EchoWidget` API for programmatic control:
 EchoWidget.show();
 EchoWidget.hide();
 EchoWidget.destroy();
-EchoWidget.init({ organizationId: 'org_xxx', position: 'bottom-left' });
+EchoWidget.init({ organizationId: "org_xxx", position: "bottom-left" });
 ```
 
 ---
@@ -276,43 +294,41 @@ Aivon/
 
 ---
 
-
 ## Module Responsibilities
 
-| Module | Responsibility |
-|---|---|
-| `convex/public/contactSessions.ts` | Create + validate anonymous user sessions (24h TTL) |
-| `convex/public/conversations.ts` | Create conversation + agent thread; list/get for widget |
-| `convex/public/messages.ts` | Submit user message → trigger agent or save only |
-| `convex/private/messages.ts` | Operator reply + `enhanceResponse` AI action |
-| `convex/private/conversations.ts` | Operator conversation list/detail + status management |
-| `convex/private/files.ts` | Upload → extract text → RAG index |
-| `convex/private/vapi.ts` | List Vapi assistants/phone numbers via server SDK |
-| `convex/private/widgetSettings.ts` | Upsert/get widget greeting + suggestions + Vapi config |
-| `convex/private/plugins.ts` | CRUD for org plugin registrations |
-| `convex/private/secrets.ts` | Trigger async AWS SM secret upsert |
-| `convex/system/ai/agents/supportAgent.ts` | Agent singleton (model + instructions) |
-| `convex/system/ai/tools/search.ts` | RAG search + second LLM interpreter pass |
-| `convex/system/ai/tools/escalateConversation.ts` | Set status → escalated |
-| `convex/system/ai/tools/resolveConversation.ts` | Set status → resolved |
-| `convex/system/ai/constants.ts` | All LLM system prompts — edit prompts HERE ONLY |
-| `convex/system/ai/rag.ts` | RAG singleton (text-embedding-3-small, 1536 dim) |
-| `convex/lib/extractTextContent.ts` | Multi-modal extraction: image/PDF/HTML/text |
-| `convex/lib/secrets.ts` | AWS Secrets Manager CRUD helpers |
-| `convex/system/subscriptions.ts` | Upsert/get org subscription status |
-| `convex/system/conversations.ts` | Internal escalate/resolve + getByThreadId |
-| `convex/system/contactSessions.ts` | Internal session refresh + getOne |
-| `convex/system/plugins.ts` | Internal plugin upsert/get |
-| `convex/system/secrets.ts` | Internal AWS SM write + plugin registration |
-| `convex/http.ts` | HTTP router — Clerk `subscription.updated` webhook |
-| `convex/schema.ts` | DB schema (single source of truth) |
-| `convex/playground.ts` | `@convex-dev/agent-playground` API exposure |
-| `apps/embed/embed.ts` | IIFE — injects button + iframe; reads `data-organization-id` |
-| `apps/embed/config.ts` | `EMBED_CONFIG.WIDGET_URL` and `DEFAULT_POSITION` |
-| `apps/widget/modules/widget/hooks/use-vapi.ts` | Vapi WebRTC voice call hook |
+| Module                                           | Responsibility                                               |
+| ------------------------------------------------ | ------------------------------------------------------------ |
+| `convex/public/contactSessions.ts`               | Create + validate anonymous user sessions (24h TTL)          |
+| `convex/public/conversations.ts`                 | Create conversation + agent thread; list/get for widget      |
+| `convex/public/messages.ts`                      | Submit user message → trigger agent or save only             |
+| `convex/private/messages.ts`                     | Operator reply + `enhanceResponse` AI action                 |
+| `convex/private/conversations.ts`                | Operator conversation list/detail + status management        |
+| `convex/private/files.ts`                        | Upload → extract text → RAG index                            |
+| `convex/private/vapi.ts`                         | List Vapi assistants/phone numbers via server SDK            |
+| `convex/private/widgetSettings.ts`               | Upsert/get widget greeting + suggestions + Vapi config       |
+| `convex/private/plugins.ts`                      | CRUD for org plugin registrations                            |
+| `convex/private/secrets.ts`                      | Trigger async AWS SM secret upsert                           |
+| `convex/system/ai/agents/supportAgent.ts`        | Agent singleton (model + instructions)                       |
+| `convex/system/ai/tools/search.ts`               | RAG search + second LLM interpreter pass                     |
+| `convex/system/ai/tools/escalateConversation.ts` | Set status → escalated                                       |
+| `convex/system/ai/tools/resolveConversation.ts`  | Set status → resolved                                        |
+| `convex/system/ai/constants.ts`                  | All LLM system prompts — edit prompts HERE ONLY              |
+| `convex/system/ai/rag.ts`                        | RAG singleton (text-embedding-3-small, 1536 dim)             |
+| `convex/lib/extractTextContent.ts`               | Multi-modal extraction: image/PDF/HTML/text                  |
+| `convex/lib/secrets.ts`                          | AWS Secrets Manager CRUD helpers                             |
+| `convex/system/subscriptions.ts`                 | Upsert/get org subscription status                           |
+| `convex/system/conversations.ts`                 | Internal escalate/resolve + getByThreadId                    |
+| `convex/system/contactSessions.ts`               | Internal session refresh + getOne                            |
+| `convex/system/plugins.ts`                       | Internal plugin upsert/get                                   |
+| `convex/system/secrets.ts`                       | Internal AWS SM write + plugin registration                  |
+| `convex/http.ts`                                 | HTTP router — Clerk `subscription.updated` webhook           |
+| `convex/schema.ts`                               | DB schema (single source of truth)                           |
+| `convex/playground.ts`                           | `@convex-dev/agent-playground` API exposure                  |
+| `apps/embed/embed.ts`                            | IIFE — injects button + iframe; reads `data-organization-id` |
+| `apps/embed/config.ts`                           | `EMBED_CONFIG.WIDGET_URL` and `DEFAULT_POSITION`             |
+| `apps/widget/modules/widget/hooks/use-vapi.ts`   | Vapi WebRTC voice call hook                                  |
 
 ---
-
 
 ## System Overview
 
@@ -368,12 +384,12 @@ graph TD
 
 ## Application Boundaries
 
-| App | Port | Auth | Audience | Entry |
-|---|---|---|---|---|
-| `apps/web` | 3000 | Clerk JWT (operators) | Support team | `app/(dashboard)/` |
-| `apps/widget` | 3001 | Contact session (anon) | End-users | `app/page.tsx` |
-| `apps/embed` | 3002 | None (script) | Any website | `embed.ts` IIFE |
-| `packages/backend` | Cloud | Convex auth | Both | `convex/` |
+| App                | Port  | Auth                   | Audience     | Entry              |
+| ------------------ | ----- | ---------------------- | ------------ | ------------------ |
+| `apps/web`         | 3000  | Clerk JWT (operators)  | Support team | `app/(dashboard)/` |
+| `apps/widget`      | 3001  | Contact session (anon) | End-users    | `app/page.tsx`     |
+| `apps/embed`       | 3002  | None (script)          | Any website  | `embed.ts` IIFE    |
+| `packages/backend` | Cloud | Convex auth            | Both         | `convex/`          |
 
 ---
 
@@ -466,16 +482,15 @@ flowchart TD
 
 ### Auth Layers
 
-| Layer | Mechanism | Where |
-|---|---|---|
-| Operator auth | Clerk JWT (multi-org) | `apps/web` + `middleware.ts` |
-| Convex auth | Clerk JWT → Convex provider | `convex/auth.config.ts` |
-| End-user auth | Contact session (24h TTL, auto-refresh at <4h) | `convex/public/contactSessions.ts` |
-| Webhook auth | Svix signature verification | `convex/http.ts` |
-| Plugin secrets | AWS Secrets Manager (no client access) | `convex/lib/secrets.ts` |
+| Layer          | Mechanism                                      | Where                              |
+| -------------- | ---------------------------------------------- | ---------------------------------- |
+| Operator auth  | Clerk JWT (multi-org)                          | `apps/web` + `middleware.ts`       |
+| Convex auth    | Clerk JWT → Convex provider                    | `convex/auth.config.ts`            |
+| End-user auth  | Contact session (24h TTL, auto-refresh at <4h) | `convex/public/contactSessions.ts` |
+| Webhook auth   | Svix signature verification                    | `convex/http.ts`                   |
+| Plugin secrets | AWS Secrets Manager (no client access)         | `convex/lib/secrets.ts`            |
 
 ---
-
 
 ### Conversation Status FSM
 
@@ -485,6 +500,7 @@ unresolved ──(agent resolve)──────────► resolved
 unresolved ──(operator reply)─────────► escalated (auto)
 escalated  ──(operator updateStatus)──► resolved
 ```
+
 Once `resolved`: all new message attempts throw `ConvexError BAD_REQUEST`.
 
 ---
@@ -511,31 +527,29 @@ Once `resolved`: all new message attempts throw `ConvexError BAD_REQUEST`.
 
 ---
 
-
 ## External Integrations
 
-| Service | Role | Integration Point |
-|---|---|---|
-| **Clerk** | Auth, multi-org, subscription webhooks | `apps/web/middleware.ts`, `convex/auth.config.ts`, `convex/http.ts` |
-| **OpenAI** | LLM inference + embeddings | `@ai-sdk/openai` throughout `convex/system/ai/` |
-| **Convex** | Serverless DB + functions + real-time | All `packages/backend/convex/` |
-| **AWS Secrets Manager** | Per-tenant third-party API keys | `convex/lib/secrets.ts` |
-| **Vapi AI** | Voice call channel | `@vapi-ai/server-sdk` (backend), `@vapi-ai/web` (widget) |
-| **Sentry** | Error monitoring (web dashboard) | `apps/web/sentry.*.config.ts`, `instrumentation.ts` |
-| **Svix** | Clerk webhook signature verification | `convex/http.ts` |
+| Service                 | Role                                   | Integration Point                                                   |
+| ----------------------- | -------------------------------------- | ------------------------------------------------------------------- |
+| **Clerk**               | Auth, multi-org, subscription webhooks | `apps/web/middleware.ts`, `convex/auth.config.ts`, `convex/http.ts` |
+| **OpenAI**              | LLM inference + embeddings             | `@ai-sdk/openai` throughout `convex/system/ai/`                     |
+| **Convex**              | Serverless DB + functions + real-time  | All `packages/backend/convex/`                                      |
+| **AWS Secrets Manager** | Per-tenant third-party API keys        | `convex/lib/secrets.ts`                                             |
+| **Vapi AI**             | Voice call channel                     | `@vapi-ai/server-sdk` (backend), `@vapi-ai/web` (widget)            |
+| **Sentry**              | Error monitoring (web dashboard)       | `apps/web/sentry.*.config.ts`, `instrumentation.ts`                 |
+| **Svix**                | Clerk webhook signature verification   | `convex/http.ts`                                                    |
 
 ---
 
 ## Async / Background Processing
 
-| Mechanism | Where Used |
-|---|---|
-| Convex `action` | All LLM calls (`public/messages.ts`, `private/messages.ts`, `private/files.ts`) — non-blocking from DB |
-| `ctx.scheduler.runAfter(0, ...)` | Secret upsert in `private/secrets.ts` — fires async internal action |
-| Real-time subscriptions | Convex queries are reactive — widget and dashboard auto-update on DB changes |
+| Mechanism                        | Where Used                                                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Convex `action`                  | All LLM calls (`public/messages.ts`, `private/messages.ts`, `private/files.ts`) — non-blocking from DB |
+| `ctx.scheduler.runAfter(0, ...)` | Secret upsert in `private/secrets.ts` — fires async internal action                                    |
+| Real-time subscriptions          | Convex queries are reactive — widget and dashboard auto-update on DB changes                           |
 
 ---
-
 
 ## Environment Variables
 
@@ -581,7 +595,6 @@ Default fallback: `http://localhost:3001` (from `apps/embed/config.ts`).
 
 ---
 
-
 ## Development Commands
 
 ### Run Everything
@@ -591,12 +604,12 @@ Default fallback: `http://localhost:3001` (from `apps/embed/config.ts`).
 pnpm dev
 ```
 
-| Process | Port | Command |
-|---|---|---|
-| `apps/web` dashboard | 3000 | `next dev --port 3000` |
-| `apps/widget` widget | 3001 | `next dev --turbopack --port 3001` |
-| `apps/embed` script | 3002 | `vite --port 3002` |
-| `packages/backend` | Convex cloud | `convex dev` |
+| Process              | Port         | Command                            |
+| -------------------- | ------------ | ---------------------------------- |
+| `apps/web` dashboard | 3000         | `next dev --port 3000`             |
+| `apps/widget` widget | 3001         | `next dev --turbopack --port 3001` |
+| `apps/embed` script  | 3002         | `vite --port 3002`                 |
+| `packages/backend`   | Convex cloud | `convex dev`                       |
 
 ### Run Individual Apps
 
@@ -613,7 +626,6 @@ cd packages/backend && pnpm dev
 pnpm build          # from repo root — builds all apps in dependency order
 cd apps/embed && pnpm build   # outputs dist/widget.iife.js
 ```
-
 
 ## Code Organization
 
@@ -712,22 +724,21 @@ apps/widget/
 
 ---
 
-
 ## Key Capabilities
 
-| Capability | Details |
-|---|---|
-| **Multi-Agent Orchestration** | Deterministic intent router + execution planner coordinating specialized capabilities (support, travel, escalation) |
-| **Voice-First Travel Agent** | Web Speech API voice interface for natural speech booking of trains, flights & buses with multi-turn state machine |
-| **AI Support Agent** | Tool-using agent (gpt-4o-mini) with autonomous search, escalate, and resolve actions |
-| **Hybrid RAG Knowledge Base** | Okapi BM25 + dense vector search fused with Reciprocal Rank Fusion (RRF); per-org namespaced |
-| **AI Safety Guardrails** | Input sanitization, PII redaction, prompt injection detection, output schema validation, sliding-window rate limiting |
-| **LLM Evaluation Pipeline** | LLM-as-a-Judge rubric scoring with human review workflow and per-org quality analytics |
-| **Embeddable Widget** | Single `<script>` tag; iframe-based; programmatic API |
-| **Real-time Dashboard** | Operator conversation inbox with live updates via Convex |
-| **Voice Support** | Vapi AI integration for phone/voice channel in the widget (ElevenLabs TTS, barge-in) |
-| **Multi-tenant** | Per-org data isolation; Clerk multi-org auth; subscription-gated AI |
-| **Operator AI Assist** | AI-polishes operator message drafts before sending |
+| Capability                    | Details                                                                                                               |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| **Multi-Agent Orchestration** | Deterministic intent router + execution planner coordinating specialized capabilities (support, travel, escalation)   |
+| **Voice-First Travel Agent**  | Web Speech API voice interface for natural speech booking of trains, flights & buses with multi-turn state machine    |
+| **AI Support Agent**          | Tool-using agent (gpt-4o-mini) with autonomous search, escalate, and resolve actions                                  |
+| **Hybrid RAG Knowledge Base** | Okapi BM25 + dense vector search fused with Reciprocal Rank Fusion (RRF); per-org namespaced                          |
+| **AI Safety Guardrails**      | Input sanitization, PII redaction, prompt injection detection, output schema validation, sliding-window rate limiting |
+| **LLM Evaluation Pipeline**   | LLM-as-a-Judge rubric scoring with human review workflow and per-org quality analytics                                |
+| **Embeddable Widget**         | Single `<script>` tag; iframe-based; programmatic API                                                                 |
+| **Real-time Dashboard**       | Operator conversation inbox with live updates via Convex                                                              |
+| **Voice Support**             | Vapi AI integration for phone/voice channel in the widget (ElevenLabs TTS, barge-in)                                  |
+| **Multi-tenant**              | Per-org data isolation; Clerk multi-org auth; subscription-gated AI                                                   |
+| **Operator AI Assist**        | AI-polishes operator message drafts before sending                                                                    |
 
 ---
 
@@ -778,30 +789,31 @@ apps/widget/
 
 ## Tech Stack
 
-| Category | Technology |
-|---|---|
-| **Monorepo** | Turborepo v2, pnpm v10 Workspaces |
-| **Dashboard** | Next.js 15 (App Router), React 19, TypeScript 5.7 |
-| **Widget** | Next.js 15 (Turbopack), React 19 |
-| **Embed Script** | Vanilla TypeScript, Vite v5 |
-| **Backend / DB** | Convex v1.25 (serverless, real-time) |
-| **AI Agent** | `@convex-dev/agent` v0.1, Vercel AI SDK v4 |
-| **LLM** | OpenAI gpt-4o-mini (chat), gpt-4o (extraction) |
-| **Embeddings** | OpenAI text-embedding-3-small (1536 dim) |
-| **RAG** | `@convex-dev/rag` v0.3 |
-| **Auth** | Clerk (multi-org, `@clerk/nextjs` v6) |
-| **Voice** | Vapi AI (`@vapi-ai/web`, `@vapi-ai/server-sdk`) |
-| **Secrets** | AWS Secrets Manager |
-| **Error Monitoring** | Sentry (`@sentry/nextjs` v9) |
-| **Styling** | Tailwind CSS v4 (via `@workspace/ui`) |
-| **State** | Jotai v2 |
-| **Forms** | React Hook Form v7 + Zod v3 |
+| Category             | Technology                                        |
+| -------------------- | ------------------------------------------------- |
+| **Monorepo**         | Turborepo v2, pnpm v10 Workspaces                 |
+| **Dashboard**        | Next.js 15 (App Router), React 19, TypeScript 5.7 |
+| **Widget**           | Next.js 15 (Turbopack), React 19                  |
+| **Embed Script**     | Vanilla TypeScript, Vite v5                       |
+| **Backend / DB**     | Convex v1.25 (serverless, real-time)              |
+| **AI Agent**         | `@convex-dev/agent` v0.1, Vercel AI SDK v4        |
+| **LLM**              | OpenAI gpt-4o-mini (chat), gpt-4o (extraction)    |
+| **Embeddings**       | OpenAI text-embedding-3-small (1536 dim)          |
+| **RAG**              | `@convex-dev/rag` v0.3                            |
+| **Auth**             | Clerk (multi-org, `@clerk/nextjs` v6)             |
+| **Voice**            | Vapi AI (`@vapi-ai/web`, `@vapi-ai/server-sdk`)   |
+| **Secrets**          | AWS Secrets Manager                               |
+| **Error Monitoring** | Sentry (`@sentry/nextjs` v9)                      |
+| **Styling**          | Tailwind CSS v4 (via `@workspace/ui`)             |
+| **State**            | Jotai v2                                          |
+| **Forms**            | React Hook Form v7 + Zod v3                       |
 
 ---
 
 ## Main Workflows
 
 ### End-User Sends a Support Message
+
 1. Widget loads → creates contact session (name + email)
 2. User starts conversation → agent thread created with greeting message
 3. User types message → **Orchestration layer** classifies intent, selects capability
@@ -810,15 +822,17 @@ apps/widget/
 6. If no KB match → agent escalates; operator takes over via queue
 
 ### Voice-First Travel Booking
+
 1. Navigate to `/travel` (publicly accessible, no auth required)
 2. Press the voice orb → browser requests microphone via Web Speech API
-3. Speak naturally: *"I need to travel from Nagpur to Mumbai tomorrow morning"*
-4. `TravelNormalizer` extracts slots (origin, destination, date, mode, time window) and handles speech corrections (*"Mumbai—sorry, Pune"*)
+3. Speak naturally: _"I need to travel from Nagpur to Mumbai tomorrow morning"_
+4. `TravelNormalizer` extracts slots (origin, destination, date, mode, time window) and handles speech corrections (_"Mumbai—sorry, Pune"_)
 5. `TravelWorkflowManager` drives state through: `GREETING → COLLECTING_REQUIREMENTS → CLARIFYING → SEARCHING → PRESENTING_OPTIONS → AWAITING_SELECTION → AWAITING_CONFIRMATION → BOOKED`
 6. Confirmed bookings execute via `DeterministicMockTravelProvider` with idempotency keys; unconfirmed bookings are strictly rejected
 7. Speech synthesis reads results back; transcript log displayed in real time
 
 ### Operator Handles a Conversation
+
 1. Signs in to dashboard → sees conversation inbox
 2. Filters by status (unresolved / escalated / resolved)
 3. Opens conversation → views full message history + contact metadata
@@ -826,6 +840,7 @@ apps/widget/
 5. Marks conversation resolved
 
 ### Setting Up a Knowledge Base
+
 1. Go to **Files** in dashboard
 2. Upload PDF, image, or text documents
 3. Files are extracted (multi-modal: image/PDF/HTML/text) and indexed into per-org hybrid RAG
@@ -833,6 +848,7 @@ apps/widget/
 5. Agent uses BM25+dense+RRF retrieval for every knowledge search
 
 ### Reviewing Conversation Quality
+
 1. Go to **Evaluations** in dashboard
 2. LLM-as-a-Judge rubric scores conversations on faithfulness, relevance, and resolution quality
 3. Operators can add human review annotations
@@ -842,30 +858,29 @@ apps/widget/
 
 ### Feature List
 
-* **Multi-Agent Orchestration** — Deterministic `ConversationRouter` → `OrchestrationPlanner` → `CapabilityRegistry` → `PlanExecutor` pipeline coordinating multiple AI capabilities.
-* **Voice-First Travel Agent** — Standalone `/travel` page with Web Speech API recognition/synthesis, multi-turn `TravelWorkflowManager`, consequential action guardrails, idempotency protection, and 100% test coverage.
-* **Hybrid RAG Knowledge Base** — Okapi BM25 + dense vector search (text-embedding-3-small) fused via Reciprocal Rank Fusion (RRF k=60) with deterministic query routing.
-* **AI Safety Guardrails** — Sliding-window rate limiting, input sanitization, PII redaction (`[REDACTED_CC]`, `[REDACTED_SSN]`), prompt injection heuristics, and LLM output schema validation.
-* **LLM Evaluation Pipeline** — LLM-as-a-Judge (v2026.1 rubric) scoring faithfulness, relevance, and resolution; human review workflow; per-org quality analytics dashboard.
-* **Convex Backend** — Serverless DB, functions, real-time updates, and end-to-end TypeScript.
-* **Public/Private Access Control** — Separate widget and operator functions with session/JWT-based authorization.
-* **Multi-Tenant Data Isolation** — Organization-scoped vector search, BM25 corpus cache, RAG namespace, and secret keys. Zero cross-tenant leakage.
-* **Secure API Key Management** — AWS Secrets Manager stores tenant-specific third-party credentials; only secret references reside in DB.
-* **Anonymous Contact Sessions** — 24-hour widget sessions with user identity and browser metadata for conversation tracking.
-* **Tool-Using AI Agent** — Stateful support agent with knowledge search, escalation, and resolution tools.
-* **Two-Stage LLM Search** — RAG retrieval followed by LLM interpretation for conversational responses.
-* **Multi-Modal Knowledge Ingestion** — Model-routed processing for PDFs, images, HTML, and text.
-* **Voice AI (Vapi + ElevenLabs)** — WebRTC voice calls in widget with barge-in, turn-ID guards, multilingual TTS (EN/HI/MR).
-* **Turborepo Monorepo** — Shared packages and coordinated builds across web, widget, and embed applications.
-* **Subscription-Gated AI** — AI operations restricted to active subscriptions with Clerk webhook synchronization.
-
+- **Multi-Agent Orchestration** — Deterministic `ConversationRouter` → `OrchestrationPlanner` → `CapabilityRegistry` → `PlanExecutor` pipeline coordinating multiple AI capabilities.
+- **Voice-First Travel Agent** — Standalone `/travel` page with Web Speech API recognition/synthesis, multi-turn `TravelWorkflowManager`, consequential action guardrails, idempotency protection, and 100% test coverage.
+- **Hybrid RAG Knowledge Base** — Okapi BM25 + dense vector search (text-embedding-3-small) fused via Reciprocal Rank Fusion (RRF k=60) with deterministic query routing.
+- **AI Safety Guardrails** — Sliding-window rate limiting, input sanitization, PII redaction (`[REDACTED_CC]`, `[REDACTED_SSN]`), prompt injection heuristics, and LLM output schema validation.
+- **LLM Evaluation Pipeline** — LLM-as-a-Judge (v2026.1 rubric) scoring faithfulness, relevance, and resolution; human review workflow; per-org quality analytics dashboard.
+- **Convex Backend** — Serverless DB, functions, real-time updates, and end-to-end TypeScript.
+- **Public/Private Access Control** — Separate widget and operator functions with session/JWT-based authorization.
+- **Multi-Tenant Data Isolation** — Organization-scoped vector search, BM25 corpus cache, RAG namespace, and secret keys. Zero cross-tenant leakage.
+- **Secure API Key Management** — AWS Secrets Manager stores tenant-specific third-party credentials; only secret references reside in DB.
+- **Anonymous Contact Sessions** — 24-hour widget sessions with user identity and browser metadata for conversation tracking.
+- **Tool-Using AI Agent** — Stateful support agent with knowledge search, escalation, and resolution tools.
+- **Two-Stage LLM Search** — RAG retrieval followed by LLM interpretation for conversational responses.
+- **Multi-Modal Knowledge Ingestion** — Model-routed processing for PDFs, images, HTML, and text.
+- **Voice AI (Vapi + ElevenLabs)** — WebRTC voice calls in widget with barge-in, turn-ID guards, multilingual TTS (EN/HI/MR).
+- **Turborepo Monorepo** — Shared packages and coordinated builds across web, widget, and embed applications.
+- **Subscription-Gated AI** — AI operations restricted to active subscriptions with Clerk webhook synchronization.
 
 ## API Endpoints
 
 The Convex backend exposes one HTTP action endpoint (registered in `http.ts`):
 
-| Method | Path | Description |
-|---|---|---|
+| Method | Path             | Description                                                                                                                                       |
+| ------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST` | `/clerk-webhook` | Receives Clerk `subscription.updated` webhook events; updates org membership limits and syncs subscription status in Convex. Validated with Svix. |
 
 All other data operations (conversations, messages, widget settings, files, etc.) are handled via **Convex real-time queries and mutations** called directly from the frontend clients — not via traditional REST endpoints.
@@ -882,10 +897,12 @@ pnpm build
 ```
 
 This runs `turbo build` which builds all apps in the correct dependency order:
+
 1. `packages/ui`, `packages/backend` (shared packages first)
 2. `apps/web`, `apps/widget`, `apps/embed`
 
 Build outputs:
+
 - `apps/web/.next/` — Next.js production bundle
 - `apps/widget/.next/` — Next.js production bundle
 - `apps/embed/dist/` — Vite bundle (the distributable `embed.js` script)
@@ -925,21 +942,23 @@ GREETING → COLLECTING_REQUIREMENTS → CLARIFYING → SEARCHING
 
 ### Key Modules
 
-| Module | Path | Responsibility |
-|--------|------|----------------|
-| `TravelNormalizer` | `system/ai/travel/normalizer.ts` | Slot extraction, location code resolution, relative date parsing, speech correction |
-| `TravelWorkflowManager` | `system/ai/travel/workflow.ts` | State machine — one call per spoken turn |
-| `DeterministicMockTravelProvider` | `system/ai/travel/provider.ts` | Train/flight/bus schedules, fare calculation, consequential booking with idempotency |
-| `TravelAgentCapability` | `system/ai/travel/capability.ts` | Orchestration capability interface |
-| `public/travel.ts` | `convex/public/travel.ts` | Convex queries & mutations (session CRUD, turn processing, booking retrieval) |
-| Travel page | `apps/web/app/(travel)/travel/page.tsx` | Web Speech API voice orb, transcript log, confirmation UI |
+| Module                            | Path                                    | Responsibility                                                                       |
+| --------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------ |
+| `TravelNormalizer`                | `system/ai/travel/normalizer.ts`        | Slot extraction, location code resolution, relative date parsing, speech correction  |
+| `TravelWorkflowManager`           | `system/ai/travel/workflow.ts`          | State machine — one call per spoken turn                                             |
+| `DeterministicMockTravelProvider` | `system/ai/travel/provider.ts`          | Train/flight/bus schedules, fare calculation, consequential booking with idempotency |
+| `TravelAgentCapability`           | `system/ai/travel/capability.ts`        | Orchestration capability interface                                                   |
+| `public/travel.ts`                | `convex/public/travel.ts`               | Convex queries & mutations (session CRUD, turn processing, booking retrieval)        |
+| Travel page                       | `apps/web/app/(travel)/travel/page.tsx` | Web Speech API voice orb, transcript log, confirmation UI                            |
 
 ### Consequential Action Guardrails
+
 - Bookings execute **only** after `confirmedByCustomer === true`
 - Idempotency keys prevent duplicate reservations
 - `travelSessions` and `travelBookings` tables store all state in Convex
 
 ### Tests
+
 ```bash
 pnpm test:travel   # runs travelNormalizer.test.ts + travelWorkflow.test.ts (100% pass)
 ```
@@ -967,6 +986,7 @@ PlanExecutor  →  executes steps, collects results, handles partial failures
 ```
 
 ### Adding a New Capability
+
 1. Create `system/ai/<name>/capability.ts` implementing `CapabilityDefinition`
 2. Add routing regex to `system/ai/orchestration/router.ts`
 3. Add execution plan entry in `system/ai/orchestration/planner.ts`
@@ -978,11 +998,11 @@ PlanExecutor  →  executes steps, collects results, handles partial failures
 
 Every knowledge base search uses a three-path retrieval architecture:
 
-| Path | Engine | Best For |
-|------|--------|----------|
-| `bm25` | Okapi BM25 (k₁=1.2, b=0.75) | Exact codes, quoted strings, technical identifiers |
-| `dense` | text-embedding-3-small (1536d) | Semantic questions, natural language |
-| `hybrid` | BM25 + Dense → RRF (k=60) | Mixed technical + conceptual queries |
+| Path     | Engine                         | Best For                                           |
+| -------- | ------------------------------ | -------------------------------------------------- |
+| `bm25`   | Okapi BM25 (k₁=1.2, b=0.75)    | Exact codes, quoted strings, technical identifiers |
+| `dense`  | text-embedding-3-small (1536d) | Semantic questions, natural language               |
+| `hybrid` | BM25 + Dense → RRF (k=60)      | Mixed technical + conceptual queries               |
 
 Query routing is **deterministic and zero-cost** (regex-based, no LLM call). Degraded mode: if OpenAI embedding API fails, falls back to pure BM25.
 
@@ -991,13 +1011,15 @@ Query routing is **deterministic and zero-cost** (regex-based, no LLM call). Deg
 ## AI Safety & Evaluation
 
 ### Safety Guardrails (applied to every public/messages.ts call)
-| Layer | Module | Action |
-|-------|--------|--------|
-| Input sanitization | `security/sanitizer.ts` | Strips control chars, wraps in `<untrusted_user_input>`, redacts PII |
-| Rate limiting | `security/rateLimiter.ts` | Sliding-window per `contactSessionId` |
-| Output validation | `security/guardrails.ts` | Schema checks, system-prompt leakage detection |
+
+| Layer              | Module                    | Action                                                               |
+| ------------------ | ------------------------- | -------------------------------------------------------------------- |
+| Input sanitization | `security/sanitizer.ts`   | Strips control chars, wraps in `<untrusted_user_input>`, redacts PII |
+| Rate limiting      | `security/rateLimiter.ts` | Sliding-window per `contactSessionId`                                |
+| Output validation  | `security/guardrails.ts`  | Schema checks, system-prompt leakage detection                       |
 
 ### LLM Evaluation
+
 - **Rubric:** v2026.1 (faithfulness, relevance, resolution quality, safety)
 - **Judge model:** gpt-4o-mini scoring 1–5 per dimension
 - **Human review:** Operators annotate disagreements in the Evaluations dashboard
@@ -1007,14 +1029,13 @@ Query routing is **deterministic and zero-cost** (regex-based, no LLM call). Deg
 
 ## Summary of Documentation
 
-| File | Description |
-|------|-------------|
-| **AGENTS.md** | Agent guide: project context, conventions, critical invariants, safe modification workflows, build commands, pitfalls |
-| **docs/architecture.md** | System architecture, application boundaries, data flow diagrams, queue state machine, agent assignment algorithm |
-| **docs/development.md** | Local setup, prerequisites, environment variables, dev commands, test guidelines |
+| File                       | Description                                                                                                                |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **AGENTS.md**              | Agent guide: project context, conventions, critical invariants, safe modification workflows, build commands, pitfalls      |
+| **docs/architecture.md**   | System architecture, application boundaries, data flow diagrams, queue state machine, agent assignment algorithm           |
+| **docs/development.md**    | Local setup, prerequisites, environment variables, dev commands, test guidelines                                           |
 | **docs/implementation.md** | Core business logic: sessions, conversation FSM, AI agent, hybrid RAG, plugin/secrets, voice AI, orchestration, evaluation |
-| **docs/api.md** | Complete Convex API reference: `public/*`, `private/*`, `system/*`, schemas, error codes, HTTP endpoints |
-| **docs/deployment.md** | Deployment guides: Vercel (web/widget), CDN (embed), Convex production backend |
-| **docs/decisions.md** | Architectural Decision Records (ADRs): technology choices, trade-offs, design rationales |
-| **CHANGELOG.md** | Chronological changelog by phase: security, LLM routing, hybrid RAG, evaluation, orchestration, voice travel agent |
-
+| **docs/api.md**            | Complete Convex API reference: `public/*`, `private/*`, `system/*`, schemas, error codes, HTTP endpoints                   |
+| **docs/deployment.md**     | Deployment guides: Vercel (web/widget), CDN (embed), Convex production backend                                             |
+| **docs/decisions.md**      | Architectural Decision Records (ADRs): technology choices, trade-offs, design rationales                                   |
+| **CHANGELOG.md**           | Chronological changelog by phase: security, LLM routing, hybrid RAG, evaluation, orchestration, voice travel agent         |

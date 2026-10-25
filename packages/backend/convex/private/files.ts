@@ -1,10 +1,8 @@
 import { ConvexError, v } from "convex/values";
-import { 
+import {
   contentHashFromArrayBuffer,
   Entry,
   EntryId,
-  guessMimeTypeFromContents,
-  guessMimeTypeFromExtension,
   vEntryId,
 } from "@convex-dev/rag";
 import { action, mutation, query, QueryCtx } from "../_generated/server";
@@ -15,14 +13,10 @@ import { paginationOptsValidator } from "convex/server";
 import { internal } from "../_generated/api";
 import { TenantBM25Cache } from "../system/ai/rag/bm25";
 import { MultiTenantRetrievalCache } from "../system/ai/cache";
-
-function guessMimeType(filename: string, bytes: ArrayBuffer): string {
-  return (
-    guessMimeTypeFromExtension(filename) ||
-    guessMimeTypeFromContents(bytes) ||
-    "application/octet-stream"
-  );
-};
+import {
+  scanUploadForMalware,
+  validateKnowledgeBaseUpload,
+} from "../lib/uploadSecurity";
 
 export const deleteFile = mutation({
   args: {
@@ -30,7 +24,7 @@ export const deleteFile = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    
+
     if (identity === null) {
       throw new ConvexError({
         code: "UNAUTHORIZED",
@@ -77,11 +71,11 @@ export const deleteFile = mutation({
     }
 
     if (entry.metadata?.storageId) {
-      await ctx.storage.delete(entry.metadata.storageId as Id<"_storage">)
+      await ctx.storage.delete(entry.metadata.storageId as Id<"_storage">);
     }
 
     await rag.deleteAsync(ctx, {
-      entryId: args.entryId
+      entryId: args.entryId,
     });
 
     // Invalidate both the BM25 index and the retrieval result cache so stale
@@ -100,7 +94,7 @@ export const addFile = action({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    
+
     if (identity === null) {
       throw new ConvexError({
         code: "UNAUTHORIZED",
@@ -127,13 +121,40 @@ export const addFile = action({
     if (subscription?.status !== "active") {
       throw new ConvexError({
         code: "BAD_REQUEST",
-        message: "Missing subscription"
+        message: "Missing subscription",
       });
     }
 
-    const { bytes, filename, category } = args;
+    const admission = await ctx.runMutation(
+      internal.system.rateLimits.checkAndAdmit,
+      {
+        organizationId: orgId,
+        estimatedTokens: 4000,
+        isExpensiveOp: true,
+      },
+    );
+    if (!admission.allowed) {
+      throw new ConvexError({
+        code: "RATE_LIMITED",
+        message: "Upload rate limit reached. Please wait and try again.",
+      });
+    }
 
-    const mimeType = args.mimeType || guessMimeType(filename, bytes);
+    if (args.category && args.category.trim().length > 80) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Category exceeds permitted length",
+      });
+    }
+
+    const { bytes, category } = args;
+    // Client MIME types and filenames are untrusted. Validate content and scan
+    // before storage so rejected content can never reach extraction or RAG.
+    const { filename, mimeType } = validateKnowledgeBaseUpload(
+      args.filename,
+      bytes,
+    );
+    await scanUploadForMalware(bytes, filename, mimeType);
     const blob = new Blob([bytes], { type: mimeType });
 
     const storageId = await ctx.storage.store(blob);
@@ -163,18 +184,24 @@ export const addFile = action({
           filename,
           category: category ?? null,
         } as EntryMetadata,
-        contentHash: await contentHashFromArrayBuffer(bytes) // To avoid re-inserting if the file content hasn't changed
+        contentHash: await contentHashFromArrayBuffer(bytes), // To avoid re-inserting if the file content hasn't changed
       });
       entryId = result.entryId;
       created = result.created;
     } catch (err) {
       // If extraction or indexing fails, clean up the orphaned storage object
       // so it doesn't leak in Convex file storage.
-      console.error("[addFile] Extraction/indexing failed; deleting orphaned storage object:", err);
+      console.error(
+        "[addFile] Extraction/indexing failed; deleting orphaned storage object:",
+        err,
+      );
       try {
         await ctx.storage.delete(storageId);
       } catch (cleanupErr) {
-        console.error("[addFile] Failed to clean up orphaned storage:", cleanupErr);
+        console.error(
+          "[addFile] Failed to clean up orphaned storage:",
+          cleanupErr,
+        );
       }
       throw new ConvexError({
         code: "BAD_REQUEST",
@@ -211,7 +238,7 @@ export const list = query({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    
+
     if (identity === null) {
       throw new ConvexError({
         code: "UNAUTHORIZED",
@@ -242,7 +269,9 @@ export const list = query({
     });
 
     const files = await Promise.all(
-      results.page.map((entry) => convertEntryToPublicFile(ctx, entry))
+      results.page
+        .filter((entry) => entry.metadata?.uploadedBy === orgId)
+        .map((entry) => convertEntryToPublicFile(ctx, entry)),
     );
 
     const filteredFiles = args.category
@@ -258,7 +287,7 @@ export const list = query({
 });
 
 export type PublicFile = {
-  id: EntryId,
+  id: EntryId;
   name: string;
   type: string;
   size: string;
@@ -299,9 +328,9 @@ async function convertEntryToPublicFile(
 
   let status: "ready" | "processing" | "error" = "error";
   if (entry.status === "ready") {
-    status = "ready"
+    status = "ready";
   } else if (entry.status === "pending") {
-    status = "processing"
+    status = "processing";
   }
 
   const url = storageId ? await ctx.storage.getUrl(storageId) : null;
@@ -315,7 +344,7 @@ async function convertEntryToPublicFile(
     url,
     category: metadata?.category || undefined,
   };
-};
+}
 
 function formatFileSize(bytes: number): string {
   if (bytes === 0) {
@@ -327,4 +356,4 @@ function formatFileSize(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
 
   return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
-};
+}

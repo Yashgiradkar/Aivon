@@ -3,6 +3,11 @@ import { action, mutation, query } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { getSecretValue, parseSecretString } from "../lib/secrets";
 import { VapiClient } from "@vapi-ai/server-sdk";
+import {
+  isConfiguredDemoActor,
+  MAX_VAPI_IDENTIFIER_LENGTH,
+  MAX_VOICE_DESCRIPTION_LENGTH,
+} from "../lib/requestSecurity";
 
 // ---------------------------------------------------------------------------
 // Validation helpers
@@ -91,6 +96,24 @@ export const upsertVoiceSettings = mutation({
     if (args.startSpeakingWaitSeconds !== undefined && args.startSpeakingWaitSeconds < 0) {
       throw new ConvexError({ code: "BAD_REQUEST", message: "startSpeakingWaitSeconds must be >= 0" });
     }
+    if (
+      args.elevenLabsVoiceId &&
+      args.elevenLabsVoiceId.length > MAX_VAPI_IDENTIFIER_LENGTH
+    ) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Voice ID is invalid",
+      });
+    }
+    if (
+      args.voiceDesignDescription &&
+      args.voiceDesignDescription.length > MAX_VOICE_DESCRIPTION_LENGTH
+    ) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Voice description exceeds permitted length",
+      });
+    }
 
     const existingSettings = await ctx.db
       .query("widgetSettings")
@@ -169,9 +192,7 @@ export const listVoiceLibrary = action({
       throw new ConvexError({ code: "UNAUTHORIZED", message: "Organization not found" });
     }
 
-    // Demo mode — return a curated set of well-known ElevenLabs voices
-    const isDemo = identity.email?.toLowerCase().includes("demo") || orgId.toLowerCase().includes("demo");
-    if (isDemo) {
+    if (isConfiguredDemoActor(identity)) {
       return DEMO_VOICE_LIBRARY;
     }
 

@@ -90,6 +90,7 @@ export default defineSchema({
     }))
   })
   .index("by_organization_id", ["organizationId"])
+  .index("by_organization_id_and_email", ["organizationId", "email"])
   .index("by_expires_at", ["expiresAt"]),
   supportQueue: defineTable({
     organizationId: v.string(),
@@ -150,7 +151,8 @@ export default defineSchema({
   })
     .index("by_organization_id", ["organizationId"])
     .index("by_organization_id_and_status", ["organizationId", "status"])
-    .index("by_agent_id", ["agentId"]),
+    .index("by_agent_id", ["agentId"])
+    .index("by_organization_id_and_agent_id", ["organizationId", "agentId"]),
   supportCalls: defineTable({
     organizationId: v.string(),
     queueEntryId: v.id("supportQueue"),
@@ -305,6 +307,12 @@ export default defineSchema({
     lastActiveAt: v.number(),
   })
     .index("by_organization_id", ["organizationId"]),
+
+  keyedRateLimits: defineTable({
+    key: v.string(),
+    windowStart: v.number(),
+    count: v.number(),
+  }).index("by_key", ["key"]),
 
   orchestrationExecutions: defineTable({
     organizationId: v.string(),

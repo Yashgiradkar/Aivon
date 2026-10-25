@@ -1,6 +1,11 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { RateLimiterLogic, SubscriptionTier, TIER_CONFIGURATIONS } from "./ai/rateLimit/rateLimiter";
+import {
+  PUBLIC_ENDPOINT_MAX_REQUESTS,
+  PUBLIC_ENDPOINT_WINDOW_MS,
+  resolveSubscriptionTier,
+} from "../lib/requestSecurity";
 
 export const checkAndAdmit = internalMutation({
   args: {
@@ -22,12 +27,10 @@ export const checkAndAdmit = internalMutation({
         .withIndex("by_organization_id", (q) => q.eq("organizationId", args.organizationId))
         .first();
 
-      const tier: SubscriptionTier =
-        sub?.status === "active"
-          ? args.organizationId.toLowerCase().includes("enterprise")
-            ? "enterprise"
-            : "pro"
-          : "free";
+      const tier: SubscriptionTier = resolveSubscriptionTier(
+        args.organizationId,
+        sub?.status,
+      );
 
       const config = TIER_CONFIGURATIONS[tier];
 
@@ -80,6 +83,51 @@ export const checkAndAdmit = internalMutation({
     }
 
     return decision;
+  },
+});
+
+export const checkKeyedWindow = internalMutation({
+  args: {
+    key: v.string(),
+    maxRequests: v.optional(v.number()),
+    windowMs: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const key = args.key.trim();
+    if (!key || key.length > 256) {
+      throw new ConvexError({
+        code: "RATE_LIMITED",
+        message: "Too many requests",
+      });
+    }
+
+    const now = Date.now();
+    const windowMs = args.windowMs ?? PUBLIC_ENDPOINT_WINDOW_MS;
+    const maxRequests = args.maxRequests ?? PUBLIC_ENDPOINT_MAX_REQUESTS;
+    const existing = await ctx.db
+      .query("keyedRateLimits")
+      .withIndex("by_key", (q) => q.eq("key", key))
+      .unique();
+
+    if (!existing || now - existing.windowStart >= windowMs) {
+      if (existing) {
+        await ctx.db.patch(existing._id, { windowStart: now, count: 1 });
+      } else {
+        await ctx.db.insert("keyedRateLimits", {
+          key,
+          windowStart: now,
+          count: 1,
+        });
+      }
+      return { allowed: true };
+    }
+
+    if (existing.count >= maxRequests) {
+      return { allowed: false };
+    }
+
+    await ctx.db.patch(existing._id, { count: existing.count + 1 });
+    return { allowed: true };
   },
 });
 

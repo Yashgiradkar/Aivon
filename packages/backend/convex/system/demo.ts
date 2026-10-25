@@ -1,8 +1,9 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { components, internal } from "../_generated/api";
 import { supportAgent } from "./ai/agents/supportAgent";
 import { saveMessage } from "@convex-dev/agent";
+import { isConfiguredDemoOrganization } from "../lib/requestSecurity";
 
 // ---------------------------------------------------------------------------
 // Idempotent Seeder for Demo Organization Data
@@ -12,6 +13,13 @@ export const seedDemoOrganization = internalMutation({
     organizationId: v.string(),
   },
   handler: async (ctx, args) => {
+    if (!isConfiguredDemoOrganization(args.organizationId)) {
+      throw new ConvexError({
+        code: "FORBIDDEN",
+        message: "Demo seeding is restricted to the configured demo organization",
+      });
+    }
+
     // 1. Ensure Active Subscription
     const existingSub = await ctx.db
       .query("subscriptions")

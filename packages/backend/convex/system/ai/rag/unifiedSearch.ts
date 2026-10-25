@@ -7,6 +7,7 @@ import { normalizeCandidates, FusedCandidate } from "./fusion";
 import { rerankSearchResults } from "./reranker";
 import { MultiTenantRetrievalCache } from "../cache/retrievalCache";
 import { logAIOperation } from "../observability/logger";
+import { ModerationPipeline } from "../security";
 
 export interface EvidenceItem {
   evidenceId: string;
@@ -306,7 +307,11 @@ export async function executeUnifiedRetrieval(
 
   // 6. Format structured evidence items with citation anchors and content badges
   const evidenceItems: EvidenceItem[] = candidateList.map((entry, idx) => {
-    const text = entry.text || "";
+    // Knowledge-base content is untrusted. Strip recognized indirect prompt
+    // injection attempts before it is returned to the agent as evidence.
+    const { sanitized: text } = ModerationPipeline.sanitizeRetrievedDocument(
+      entry.text || "",
+    );
     let contentType: EvidenceItem["contentType"] = "prose";
     if (text.includes("Table:") || text.includes("Data Records:") || text.includes("|")) {
       contentType = "table";

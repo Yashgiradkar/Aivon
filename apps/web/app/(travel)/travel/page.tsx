@@ -27,7 +27,8 @@ import {
   Compass,
 } from "lucide-react";
 
-export type VoiceState = "idle" | "listening" | "processing" | "speaking" | "muted" | "error";
+export type VoiceState =
+  "idle" | "listening" | "processing" | "speaking" | "muted" | "error";
 
 interface Message {
   id: string;
@@ -56,7 +57,8 @@ export default function TravelVoiceAgentPage() {
   // Travel Data
   const [options, setOptions] = useState<any[]>([]);
   const [selectedOption, setSelectedOption] = useState<any | null>(null);
-  const [confirmationRequired, setConfirmationRequired] = useState<boolean>(false);
+  const [confirmationRequired, setConfirmationRequired] =
+    useState<boolean>(false);
   const [bookingConfirmed, setBookingConfirmed] = useState<any | null>(null);
   const [quickReplies, setQuickReplies] = useState<string[]>([
     "Travel from Nagpur to Mumbai tomorrow morning",
@@ -72,26 +74,31 @@ export default function TravelVoiceAgentPage() {
 
   // Initialize travel session on mount
   useEffect(() => {
-    let token = localStorage.getItem("aivon_travel_session");
-    if (!token) {
-      token = `ts_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-      localStorage.setItem("aivon_travel_session", token);
-    }
-    setSessionToken(token);
+    const organizationId =
+      process.env.NEXT_PUBLIC_TRAVEL_ORGANIZATION_ID ||
+      process.env.NEXT_PUBLIC_DEMO_ORGANIZATION_ID ||
+      "";
+    const existingToken = localStorage.getItem("aivon_travel_session") || undefined;
 
     createOrGetSession({
-      organizationId: "org_travel_demo",
-      sessionToken: token,
+      organizationId,
+      sessionToken: existingToken,
     })
       .then((session) => {
-        if (session) {
-          setWorkflowState(session.status);
+        if (!session) return;
+        localStorage.setItem("aivon_travel_session", session.sessionToken);
+        setSessionToken(session.sessionToken);
+        setWorkflowState(session.status);
+        try {
           if (session.searchResults) {
             setOptions(JSON.parse(session.searchResults));
           }
           if (session.selectedOption) {
             setSelectedOption(JSON.parse(session.selectedOption));
           }
+        } catch {
+          setOptions([]);
+          setSelectedOption(null);
         }
       })
       .catch((err) => console.warn("Failed to load initial session:", err));
@@ -107,7 +114,10 @@ export default function TravelVoiceAgentPage() {
         id: "msg_welcome",
         role: "assistant",
         text: "Namaste! I am your AI Travel Agent. Where would you like to travel today? You can speak naturally, for example 'I need to travel from Nagpur to Mumbai tomorrow morning'.",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
       },
     ]);
   }, [createOrGetSession]);
@@ -115,7 +125,8 @@ export default function TravelVoiceAgentPage() {
   // Auto-scroll transcript
   useEffect(() => {
     if (transcriptScrollRef.current) {
-      transcriptScrollRef.current.scrollTop = transcriptScrollRef.current.scrollHeight;
+      transcriptScrollRef.current.scrollTop =
+        transcriptScrollRef.current.scrollHeight;
     }
   }, [messages, liveTranscript]);
 
@@ -139,7 +150,9 @@ export default function TravelVoiceAgentPage() {
 
     // Pick English (India) or pleasant default voice if available
     const voices = synthRef.current.getVoices();
-    const inVoice = voices.find((v) => v.lang.includes("en-IN") || v.name.includes("India"));
+    const inVoice = voices.find(
+      (v) => v.lang.includes("en-IN") || v.name.includes("India"),
+    );
     if (inVoice) {
       utterance.voice = inVoice;
     }
@@ -183,7 +196,10 @@ export default function TravelVoiceAgentPage() {
         id: `msg_user_${Date.now()}`,
         role: "user",
         text: trimmed,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
       };
       setMessages((prev) => [...prev, userMsg]);
       setLiveTranscript("");
@@ -200,7 +216,10 @@ export default function TravelVoiceAgentPage() {
           id: `msg_asst_${Date.now()}`,
           role: "assistant",
           text: result.spokenResponse,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
         };
         setMessages((prev) => [...prev, assistantMsg]);
         setWorkflowState(result.nextState);
@@ -208,8 +227,10 @@ export default function TravelVoiceAgentPage() {
         if (result.options) setOptions(result.options);
         if (result.selectedOption) setSelectedOption(result.selectedOption);
         setConfirmationRequired(result.confirmationRequired);
-        if (result.suggestedQuickReplies) setQuickReplies(result.suggestedQuickReplies);
-        if (result.bookingResult?.success) setBookingConfirmed(result.bookingResult);
+        if (result.suggestedQuickReplies)
+          setQuickReplies(result.suggestedQuickReplies);
+        if (result.bookingResult?.success)
+          setBookingConfirmed(result.bookingResult);
 
         // Speak response out loud
         speakAgentResponse(result.spokenResponse);
@@ -222,12 +243,15 @@ export default function TravelVoiceAgentPage() {
             id: `msg_err_${Date.now()}`,
             role: "assistant",
             text: "I am having trouble connecting to travel inventory right now. Please try again.",
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            timestamp: new Date().toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
           },
         ]);
       }
     },
-    [sessionToken, processSpokenTurn, interruptAgent, speakAgentResponse]
+    [sessionToken, processSpokenTurn, interruptAgent, speakAgentResponse],
   );
 
   // Browser Web Speech Recognition Start
@@ -235,10 +259,13 @@ export default function TravelVoiceAgentPage() {
     interruptAgent();
 
     const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      alert("Voice speech recognition is not supported in this browser. You can type in the box below!");
+      alert(
+        "Voice speech recognition is not supported in this browser. You can type in the box below!",
+      );
       return;
     }
 
@@ -332,7 +359,10 @@ export default function TravelVoiceAgentPage() {
           id: `msg_conf_${Date.now()}`,
           role: "assistant",
           text: spoken,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
         },
       ]);
       speakAgentResponse(spoken);
@@ -356,7 +386,10 @@ export default function TravelVoiceAgentPage() {
         id: `msg_new_${Date.now()}`,
         role: "assistant",
         text: "I have started a new search session. Where would you like to travel?",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
       },
     ]);
   };
@@ -373,12 +406,16 @@ export default function TravelVoiceAgentPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold tracking-tight text-white">Aivon Voice Travel</h1>
+              <h1 className="text-lg font-bold tracking-tight text-white">
+                Aivon Voice Travel
+              </h1>
               <span className="text-[10px] font-semibold bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/20 uppercase tracking-wider">
                 Voice First AI
               </span>
             </div>
-            <p className="text-xs text-slate-400">Natural voice assistant for trains, flights & buses</p>
+            <p className="text-xs text-slate-400">
+              Natural voice assistant for trains, flights & buses
+            </p>
           </div>
         </div>
 
@@ -453,7 +490,9 @@ export default function TravelVoiceAgentPage() {
 
               {/* Main Button / Voice Sphere */}
               <button
-                onClick={voiceState === "listening" ? stopListening : startListening}
+                onClick={
+                  voiceState === "listening" ? stopListening : startListening
+                }
                 className={`h-36 w-36 rounded-full flex flex-col items-center justify-center transition-all duration-300 transform active:scale-95 shadow-2xl ${
                   voiceState === "listening"
                     ? "bg-gradient-to-tr from-emerald-600 to-teal-400 shadow-emerald-500/40 ring-4 ring-emerald-500/20"
@@ -461,7 +500,11 @@ export default function TravelVoiceAgentPage() {
                       ? "bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-500 shadow-cyan-500/40 ring-4 ring-cyan-500/20"
                       : "bg-gradient-to-tr from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 shadow-blue-600/30"
                 }`}
-                aria-label={voiceState === "listening" ? "Stop microphone" : "Start speaking"}
+                aria-label={
+                  voiceState === "listening"
+                    ? "Stop microphone"
+                    : "Start speaking"
+                }
               >
                 {voiceState === "listening" ? (
                   <Square className="h-10 w-10 text-white fill-white" />
@@ -484,7 +527,7 @@ export default function TravelVoiceAgentPage() {
                   style={{
                     height:
                       voiceState === "listening" || voiceState === "speaking"
-                        ? `${Math.max(6, (height * Math.random() * 1.5).toFixed(0))}px`
+                        ? `${Math.max(6, Math.round(height * Math.random() * 1.5))}px`
                         : "4px",
                   }}
                   className={`w-1 rounded-full transition-all duration-150 ${
@@ -560,7 +603,9 @@ export default function TravelVoiceAgentPage() {
                   <div className="text-xl font-bold text-emerald-400">
                     ₹{bookingConfirmed.totalFare}
                   </div>
-                  <span className="text-xs text-slate-400">Paid & Confirmed</span>
+                  <span className="text-xs text-slate-400">
+                    Paid & Confirmed
+                  </span>
                 </div>
               </div>
 
@@ -568,18 +613,22 @@ export default function TravelVoiceAgentPage() {
                 <div className="mt-4 pt-4 border-t border-emerald-500/20 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                   <div>
                     <span className="text-slate-400">Service</span>
-                    <p className="font-semibold text-white">{selectedOption.serviceName}</p>
+                    <p className="font-semibold text-white">
+                      {selectedOption.serviceName}
+                    </p>
                   </div>
                   <div>
                     <span className="text-slate-400">Departure</span>
                     <p className="font-semibold text-white">
-                      {selectedOption.departureTime} ({selectedOption.originCode})
+                      {selectedOption.departureTime} (
+                      {selectedOption.originCode})
                     </p>
                   </div>
                   <div>
                     <span className="text-slate-400">Arrival</span>
                     <p className="font-semibold text-white">
-                      {selectedOption.arrivalTime} ({selectedOption.destinationCode})
+                      {selectedOption.arrivalTime} (
+                      {selectedOption.destinationCode})
                     </p>
                   </div>
                   <div>
@@ -612,7 +661,9 @@ export default function TravelVoiceAgentPage() {
                   return (
                     <div
                       key={opt.id || index}
-                      onClick={() => handleUserTurn(`Select option ${index + 1}`)}
+                      onClick={() =>
+                        handleUserTurn(`Select option ${index + 1}`)
+                      }
                       className={`cursor-pointer rounded-xl border p-4 transition-all duration-200 relative ${
                         isSelected
                           ? "bg-blue-950/60 border-blue-500 ring-2 ring-blue-500/20 shadow-lg shadow-blue-500/10"
@@ -640,31 +691,47 @@ export default function TravelVoiceAgentPage() {
                             Option {index + 1}: {opt.serviceName}
                           </span>
                         </div>
-                        <span className="text-sm font-bold text-emerald-400">₹{opt.fare}</span>
+                        <span className="text-sm font-bold text-emerald-400">
+                          ₹{opt.fare}
+                        </span>
                       </div>
 
                       <div className="flex items-center justify-between text-xs text-slate-300 my-2">
                         <div>
-                          <p className="text-base font-bold text-white">{opt.departureTime}</p>
-                          <p className="text-[11px] text-slate-400">{opt.originCode}</p>
+                          <p className="text-base font-bold text-white">
+                            {opt.departureTime}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {opt.originCode}
+                          </p>
                         </div>
                         <div className="flex flex-col items-center">
-                          <span className="text-[10px] text-slate-400">{opt.duration}</span>
+                          <span className="text-[10px] text-slate-400">
+                            {opt.duration}
+                          </span>
                           <div className="w-16 h-[2px] bg-slate-700 relative my-1">
                             <div className="absolute left-1/2 -top-1 -translate-x-1/2 h-2 w-2 rounded-full bg-blue-400" />
                           </div>
                           <span className="text-[10px] text-slate-500">
-                            {opt.stops === 0 ? "Non-stop" : `${opt.stops} stops`}
+                            {opt.stops === 0
+                              ? "Non-stop"
+                              : `${opt.stops} stops`}
                           </span>
                         </div>
                         <div className="text-right">
-                          <p className="text-base font-bold text-white">{opt.arrivalTime}</p>
-                          <p className="text-[11px] text-slate-400">{opt.destinationCode}</p>
+                          <p className="text-base font-bold text-white">
+                            {opt.arrivalTime}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {opt.destinationCode}
+                          </p>
                         </div>
                       </div>
 
                       <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-                        <span className="text-slate-400">Class: {opt.seatClass}</span>
+                        <span className="text-slate-400">
+                          Class: {opt.seatClass}
+                        </span>
                         <span className="text-emerald-400 font-medium">
                           {opt.availableSeats} seats left
                         </span>
@@ -682,8 +749,9 @@ export default function TravelVoiceAgentPage() {
                       Ready to confirm booking
                     </h4>
                     <p className="text-sm text-slate-200">
-                      Confirm {selectedOption.serviceName} ({selectedOption.departureTime}) for ₹
-                      {selectedOption.fare}?
+                      Confirm {selectedOption.serviceName} (
+                      {selectedOption.departureTime}) for ₹{selectedOption.fare}
+                      ?
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
@@ -712,10 +780,15 @@ export default function TravelVoiceAgentPage() {
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 Live Conversation Transcript
               </span>
-              <span className="text-xs text-slate-500">Continuous Multi-turn Memory</span>
+              <span className="text-xs text-slate-500">
+                Continuous Multi-turn Memory
+              </span>
             </div>
 
-            <div ref={transcriptScrollRef} className="flex-1 overflow-y-auto space-y-3 pr-2">
+            <div
+              ref={transcriptScrollRef}
+              className="flex-1 overflow-y-auto space-y-3 pr-2"
+            >
               {messages.map((msg) => (
                 <div
                   key={msg.id}
@@ -732,7 +805,9 @@ export default function TravelVoiceAgentPage() {
                   >
                     {msg.text}
                   </div>
-                  <span className="text-[10px] text-slate-500 mt-1 px-1">{msg.timestamp}</span>
+                  <span className="text-[10px] text-slate-500 mt-1 px-1">
+                    {msg.timestamp}
+                  </span>
                 </div>
               ))}
             </div>

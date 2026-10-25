@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { internal } from "../_generated/api";
+import { MAX_SKILL_COUNT, MAX_SKILL_LENGTH } from "../lib/requestSecurity";
 
 // ---------------------------------------------------------------------------
 // Operator: Real-time list of waiting & active queue entries
@@ -34,7 +35,7 @@ export const getQueueList = query({
           q.eq("organizationId", orgId).eq("status", args.status as any)
         )
         .order("desc")
-        .collect();
+        .take(200);
     }
 
     // For "all" active items, leverage compound index by status to avoid scanning
@@ -85,6 +86,19 @@ export const setAgentPresence = mutation({
     }
 
     const orgId = identity.orgId as string;
+    if (
+      args.skills &&
+      (args.skills.length > MAX_SKILL_COUNT ||
+        args.skills.some(
+          (skill) => !skill.trim() || skill.trim().length > MAX_SKILL_LENGTH,
+        ))
+    ) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Agent skills are invalid",
+      });
+    }
+
     const agentId = identity.subject;
     const agentName =
       identity.name ||
@@ -94,8 +108,10 @@ export const setAgentPresence = mutation({
 
     const existing = await ctx.db
       .query("supportAgentAvailability")
-      .withIndex("by_agent_id", (q) => q.eq("agentId", agentId))
-      .first();
+      .withIndex("by_organization_id_and_agent_id", (q) =>
+        q.eq("organizationId", orgId).eq("agentId", agentId),
+      )
+      .unique();
 
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -141,8 +157,10 @@ export const getAgentPresence = query({
 
     return await ctx.db
       .query("supportAgentAvailability")
-      .withIndex("by_agent_id", (q) => q.eq("agentId", agentId))
-      .first();
+      .withIndex("by_organization_id_and_agent_id", (q) =>
+        q.eq("organizationId", identity.orgId as string).eq("agentId", agentId),
+      )
+      .unique();
   },
 });
 
@@ -195,8 +213,10 @@ export const acceptQueueEntry = mutation({
     // Update agent presence
     const agentRecord = await ctx.db
       .query("supportAgentAvailability")
-      .withIndex("by_agent_id", (q) => q.eq("agentId", agentId))
-      .first();
+      .withIndex("by_organization_id_and_agent_id", (q) =>
+        q.eq("organizationId", orgId).eq("agentId", agentId),
+      )
+      .unique();
 
     if (agentRecord) {
       await ctx.db.patch(agentRecord._id, {
@@ -227,8 +247,11 @@ export const completeQueueEntry = mutation({
       });
     }
 
+    const orgId = identity.orgId as string;
     const queueEntry = await ctx.db.get(args.queueEntryId);
-    if (!queueEntry) return;
+    if (!queueEntry || queueEntry.organizationId !== orgId) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Queue entry not found" });
+    }
 
     await ctx.db.patch(args.queueEntryId, {
       status: "completed",
@@ -238,8 +261,10 @@ export const completeQueueEntry = mutation({
     const agentId = identity.subject;
     const agentRecord = await ctx.db
       .query("supportAgentAvailability")
-      .withIndex("by_agent_id", (q) => q.eq("agentId", agentId))
-      .first();
+      .withIndex("by_organization_id_and_agent_id", (q) =>
+        q.eq("organizationId", orgId).eq("agentId", agentId),
+      )
+      .unique();
 
     if (agentRecord) {
       await ctx.db.patch(agentRecord._id, {
@@ -251,7 +276,7 @@ export const completeQueueEntry = mutation({
 
       // Match next customer
       await ctx.scheduler.runAfter(0, internal.system.queue.matchAndAssign, {
-        organizationId: identity.orgId as string,
+        organizationId: orgId,
       });
     }
   },

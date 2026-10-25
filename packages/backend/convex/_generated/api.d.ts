@@ -11,7 +11,9 @@
 import type * as constants from "../constants.js";
 import type * as http from "../http.js";
 import type * as lib_extractTextContent from "../lib/extractTextContent.js";
+import type * as lib_requestSecurity from "../lib/requestSecurity.js";
 import type * as lib_secrets from "../lib/secrets.js";
+import type * as lib_uploadSecurity from "../lib/uploadSecurity.js";
 import type * as playground from "../playground.js";
 import type * as private_contactSessions from "../private/contactSessions.js";
 import type * as private_conversations from "../private/conversations.js";
@@ -124,7 +126,9 @@ declare const fullApi: ApiFromModules<{
   constants: typeof constants;
   http: typeof http;
   "lib/extractTextContent": typeof lib_extractTextContent;
+  "lib/requestSecurity": typeof lib_requestSecurity;
   "lib/secrets": typeof lib_secrets;
+  "lib/uploadSecurity": typeof lib_uploadSecurity;
   playground: typeof playground;
   "private/contactSessions": typeof private_contactSessions;
   "private/conversations": typeof private_conversations;
