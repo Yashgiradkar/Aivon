@@ -21,8 +21,10 @@ export interface QueryClassification {
   features: QueryFeatures;
 }
 
-// Regex patterns for identifiers, error codes, and technical symbols
-const EXACT_CODE_PATTERN = /\b([A-Z0-9]{2,}[-_:][A-Z0-9]+|(?:ERR|ERROR|CODE|TICKET|SKU|REF|ID|ISO|SEC|V|API)[-_:]?\d+)\b/gi;
+// Regex patterns for identifiers, error codes, and technical symbols.
+// Greedily matches multi-segment identifiers (e.g. TEST-POL-482731, ERR-404, SKU-ABC-001)
+// so that all segments are captured as a single unit rather than being split.
+const EXACT_CODE_PATTERN = /\b([A-Z0-9]{2,}(?:[-_:][A-Z0-9]+)+|(?:ERR|ERROR|CODE|TICKET|SKU|REF|ID|ISO|SEC|V|API)[-_:]?\d+)\b/gi;
 const TECHNICAL_IDENTIFIER_PATTERN = /\b[a-zA-Z_][a-zA-Z0-9_]*[._/][a-zA-Z0-9_./]+\b|\b[a-z]+[A-Z][a-zA-Z0-9]+\b|\b[a-z]+_[a-z0-9_]+\b/g;
 const QUOTED_PHRASE_PATTERN = /"([^"]+)"|'([^']+)'/g;
 const SEMANTIC_INTERROGATIVE_PATTERN = /^(how|why|what|explain|describe|tell me|can i|is there|guide me|steps to|ways to|when should|help me with)\b/i;

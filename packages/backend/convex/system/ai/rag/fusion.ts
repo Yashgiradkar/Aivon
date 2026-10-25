@@ -81,28 +81,45 @@ export function reciprocalRankFusion(
 }
 
 /**
- * Normalizes dense vector entries and BM25 results into uniform candidates
+ * Normalizes dense vector entries and BM25 results into uniform candidates,
+ * then fuses them via Reciprocal Rank Fusion (RRF).
+ *
+ * Both lists are keyed by `entryId` so that multiple BM25 chunks from the same
+ * document and the corresponding dense result all merge before fusion. Without
+ * this normalization the ID spaces are disjoint and RRF never deduplicates.
  */
 export function normalizeCandidates(
   vectorEntries: Array<{ title?: string; text?: string; score?: number; entryId?: string; [key: string]: unknown }>,
   bm25Results: Array<{ id: string; entryId: string; title: string; text: string; score: number }>,
   options: RRFOptions = {}
 ): FusedCandidate[] {
-  const denseCandidates: CandidateItem[] = vectorEntries.map((e, idx) => ({
-    id: (e.entryId as string) ? `${e.entryId}:${idx}` : `dense_${idx}_${(e.title || "").slice(0, 20)}`,
-    entryId: (e.entryId as string) || `entry_${idx}`,
+  // Use entryId as the canonical ID so dense and BM25 results for the same
+  // document collapse to one candidate before RRF scoring.
+  const denseCandidates: CandidateItem[] = vectorEntries.map((e) => ({
+    id: (e.entryId as string) || `dense_no_entry_${Math.random()}`,
+    entryId: (e.entryId as string) || "",
     title: (e.title as string) || "Knowledge Document",
     text: (e.text as string) || "",
     score: e.score,
   }));
 
-  const bm25Candidates: CandidateItem[] = bm25Results.map((b) => ({
-    id: b.id,
-    entryId: b.entryId,
-    title: b.title,
-    text: b.text,
-    score: b.score,
-  }));
+  // For BM25, multiple chunks may share the same entryId. Deduplicate by
+  // entryId, keeping the chunk with the highest BM25 score as the representative.
+  const bm25ByEntry = new Map<string, CandidateItem & { score: number }>();
+  for (const b of bm25Results) {
+    const existing = bm25ByEntry.get(b.entryId);
+    if (!existing || b.score > existing.score) {
+      bm25ByEntry.set(b.entryId, {
+        id: b.entryId,
+        entryId: b.entryId,
+        title: b.title,
+        text: b.text,
+        score: b.score,
+      });
+    }
+  }
+  const bm25Candidates: CandidateItem[] = Array.from(bm25ByEntry.values());
 
   return reciprocalRankFusion(denseCandidates, bm25Candidates, options);
 }
+

@@ -14,6 +14,7 @@ import { Id } from "../_generated/dataModel";
 import { paginationOptsValidator } from "convex/server";
 import { internal } from "../_generated/api";
 import { TenantBM25Cache } from "../system/ai/rag/bm25";
+import { MultiTenantRetrievalCache } from "../system/ai/cache";
 
 function guessMimeType(filename: string, bytes: ArrayBuffer): string {
   return (
@@ -83,7 +84,10 @@ export const deleteFile = mutation({
       entryId: args.entryId
     });
 
+    // Invalidate both the BM25 index and the retrieval result cache so stale
+    // answers are not served after the document has been permanently deleted.
     TenantBM25Cache.invalidate(orgId);
+    MultiTenantRetrievalCache.invalidateOrg(orgId);
   },
 });
 
@@ -134,35 +138,64 @@ export const addFile = action({
 
     const storageId = await ctx.storage.store(blob);
 
-    const text = await extractTextContent(ctx, {
-      storageId,
-      filename,
-      bytes,
-      mimeType,
-    });
+    let text: string;
+    let entryId: EntryId;
+    let created: boolean;
 
-    const { entryId, created } = await rag.add(ctx, {
-      // SUPER IMPORTANT: What search space to add this to. You cannot search across namespaces,
-      // If not added, it will be considered global (we do not want this)
-      namespace: orgId,
-      text,
-      key: filename,
-      title: filename,
-      metadata: {
-        storageId, // Important for file deletion
-        uploadedBy: orgId, // Important for deletion
+    try {
+      text = await extractTextContent(ctx, {
+        storageId,
         filename,
-        category: category ?? null,
-      } as EntryMetadata,
-      contentHash: await contentHashFromArrayBuffer(bytes) // To avoid re-inserting if the file content hasn't changed
-    });
+        bytes,
+        mimeType,
+      });
+
+      const result = await rag.add(ctx, {
+        // SUPER IMPORTANT: What search space to add this to. You cannot search across namespaces,
+        // If not added, it will be considered global (we do not want this)
+        namespace: orgId,
+        text,
+        key: filename,
+        title: filename,
+        metadata: {
+          storageId, // Important for file deletion
+          uploadedBy: orgId, // Important for deletion
+          filename,
+          category: category ?? null,
+        } as EntryMetadata,
+        contentHash: await contentHashFromArrayBuffer(bytes) // To avoid re-inserting if the file content hasn't changed
+      });
+      entryId = result.entryId;
+      created = result.created;
+    } catch (err) {
+      // If extraction or indexing fails, clean up the orphaned storage object
+      // so it doesn't leak in Convex file storage.
+      console.error("[addFile] Extraction/indexing failed; deleting orphaned storage object:", err);
+      try {
+        await ctx.storage.delete(storageId);
+      } catch (cleanupErr) {
+        console.error("[addFile] Failed to clean up orphaned storage:", cleanupErr);
+      }
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Failed to process file. Please try again or contact support.",
+      });
+    }
 
     if (!created) {
+      // Duplicate detected via contentHash — the new storage blob is redundant.
+      // Delete it and return the existing entry without a URL (storage was removed).
       console.debug("entry already exists, skipping upload metadata");
       await ctx.storage.delete(storageId);
-    } else {
-      TenantBM25Cache.invalidate(orgId);
+      return {
+        url: null,
+        entryId,
+      };
     }
+
+    // Invalidate both caches so the new document is immediately available.
+    TenantBM25Cache.invalidate(orgId);
+    MultiTenantRetrievalCache.invalidateOrg(orgId);
 
     return {
       url: await ctx.storage.getUrl(storageId),

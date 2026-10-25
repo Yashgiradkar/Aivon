@@ -218,7 +218,16 @@ export class BM25Index {
 
 /**
  * Tenant-Isolated In-Memory BM25 Cache
- * Caches built BM25 index per organizationId to ensure sub-millisecond retrieval.
+ *
+ * Caches a built BM25 index per organizationId within the current process.
+ *
+ * IMPORTANT — Serverless behaviour: Convex actions run as serverless functions.
+ * Each cold invocation starts with an empty module-level Map, so this cache
+ * provides no benefit across independent invocations. When the same container
+ * is reused for a second request (warm start), the cache saves the O(n) index
+ * rebuild. The 30-minute TTL guards against stale data on warm containers but
+ * is not the primary latency concern. Accept the rebuild cost at current
+ * scale; revisit if p95 search latency exceeds the agreed SLA.
  */
 export class TenantBM25Cache {
   private static indices = new Map<string, { index: BM25Index; timestamp: number }>();
