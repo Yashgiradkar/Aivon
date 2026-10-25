@@ -305,5 +305,37 @@ export default defineSchema({
     lastActiveAt: v.number(),
   })
     .index("by_organization_id", ["organizationId"]),
+
+  orchestrationExecutions: defineTable({
+    organizationId: v.string(),
+    conversationId: v.id("conversations"),
+    threadId: v.string(),
+    triggerMessage: v.string(),
+    idempotencyKey: v.string(),
+    channel: v.union(v.literal("chat"), v.literal("voice"), v.literal("operator")),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("escalated"),
+      v.literal("waiting_for_approval"),
+      v.literal("failed"),
+      v.literal("cancelled")
+    ),
+    routingCategory: v.string(),
+    executionPlan: v.string(), // Serialized JSON execution plan
+    stepResults: v.string(), // Serialized JSON step results
+    finalResponse: v.optional(v.string()),
+    error: v.optional(v.string()),
+    latencyMs: v.optional(v.number()),
+    totalTokensUsed: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_conversation_id", ["conversationId"])
+    .index("by_idempotency_key", ["idempotencyKey"])
+    .index("by_org_and_status", ["organizationId", "status"]),
 });
 

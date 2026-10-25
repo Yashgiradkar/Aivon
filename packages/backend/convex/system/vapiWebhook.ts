@@ -28,6 +28,75 @@ function formatForSpeech(text: string): string {
     .trim();
 }
 
+export { formatForSpeech };
+
+// ---------------------------------------------------------------------------
+// Internal action: execute Multi-Agent Voice Orchestration with speech formatting
+// ---------------------------------------------------------------------------
+export const executeVoiceOrchestration = internalAction({
+  args: {
+    organizationId: v.string(),
+    query: v.string(),
+    conversationId: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<string> => {
+    // 1. Spoken policy number ambiguity detection
+    const ambiguity = detectAmbiguousVoiceIdentifier(args.query);
+    if (ambiguity.isAmbiguous && ambiguity.suggestedClarification) {
+      return ambiguity.suggestedClarification;
+    }
+
+    // 2. If conversationId is valid, orchestrate through multi-agent orchestration layer
+    if (args.conversationId) {
+      try {
+        const conversation = await ctx.runQuery(
+          internal.system.conversations.getOne,
+          { conversationId: args.conversationId as Id<"conversations"> }
+        );
+
+        if (conversation) {
+          const { orchestrateConversationTurn } = await import("./ai/orchestration");
+          const orchestrationResult = await orchestrateConversationTurn(ctx, {
+            organizationId: args.organizationId,
+            conversationId: conversation._id,
+            threadId: conversation.threadId,
+            contactSessionId: conversation.contactSessionId,
+            prompt: args.query,
+            channel: "voice",
+            maxBudgetMs: 8000,
+          });
+
+          if (orchestrationResult.responseMessage) {
+            return formatForSpeech(orchestrationResult.responseMessage);
+          }
+        }
+      } catch (err) {
+        console.warn("[VoiceOrchestration] Multi-agent orchestration fallback:", err);
+      }
+    }
+
+    // 3. Fallback to unified hybrid retrieval
+    const result = await executeUnifiedRetrieval(ctx, {
+      organizationId: args.organizationId,
+      query: args.query,
+      limit: 3,
+      source: "voice",
+    });
+
+    if (result.evidenceItems.length === 0) {
+      return "I could not find specific details about that in our knowledge base. Would you like me to connect you with a human support specialist?";
+    }
+
+    const bestText = result.evidenceItems.map((e) => e.text).join(". ");
+    const spoken = formatForSpeech(bestText);
+
+    return (
+      spoken ||
+      "I found relevant information in our knowledge base, but I cannot summarize it right now."
+    );
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Internal action: execute RAG search for voice assistant with unified hybrid routing & ambiguity detection
 // ---------------------------------------------------------------------------

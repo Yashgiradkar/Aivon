@@ -12,6 +12,7 @@ import { logAIOperation } from "../system/ai/observability";
 import { estimateTokens } from "../system/ai/context";
 import { MemoryManagerLogic } from "../system/ai/memory/memoryManager";
 import { SemanticCacheLogic } from "../system/ai/cache/semanticCache";
+import { orchestrateConversationTurn } from "../system/ai/orchestration";
 
 export const create = action({
   args: {
@@ -143,65 +144,23 @@ export const create = action({
     let promptForAgent = cleanPrompt;
 
     if (shouldTriggerAgent) {
-      try {
-        const activeMemories = await ctx.runQuery(internal.system.memory.getActiveCustomerMemories, {
-          organizationId: conversation.organizationId,
-          customerIdentifier,
-        });
-
-        if (activeMemories && activeMemories.length > 0) {
-          const memoryBlock = MemoryManagerLogic.formatMemoryPromptBlock(activeMemories, 300);
-          if (memoryBlock) {
-            promptForAgent = `${memoryBlock}\n\nCustomer: ${cleanPrompt}`;
-          }
-        }
-      } catch {
-        // Fallback gracefully without memories if query fails
-        promptForAgent = cleanPrompt;
-      }
-
-      const response = await supportAgent.generateText(
-        ctx,
-        { threadId: args.threadId },
-        {
-          prompt: promptForAgent,
-          tools: {
-            escalateConversationTool: escalateConversation,
-            resolveConversationTool: resolveConversation,
-            searchTool: search,
-          }
-        },
-      );
-
-      // Multi-stage output moderation
-      const outputModeration = ModerationPipeline.moderateOutput(response.text);
-      const validated = validateAgentOutput(outputModeration.sanitizedText);
-      const lastText = validated.sanitizedResponse || cleanPrompt;
-
-      const inputTokens = estimateTokens(promptForAgent);
-      const outputTokens = estimateTokens(lastText);
-      const latencyMs = Date.now() - startTime;
-
-      logAIOperation({
-        event: "llm.response",
+      const orchestration = await orchestrateConversationTurn(ctx, {
         organizationId: conversation.organizationId,
         conversationId: conversation._id,
         threadId: args.threadId,
-        model: "gpt-4o-mini",
-        latencyMs,
-        inputTokens,
-        outputTokens,
-        details: {
-          isSuspiciousInput: moderation.flagged,
-          outputViolations: validated.violations,
-        },
+        contactSessionId: args.contactSessionId,
+        prompt: cleanPrompt,
+        channel: "chat",
       });
 
-      // Update last message with the assistant's response
+      const lastText = orchestration.responseMessage;
+      const totalTokensUsed = orchestration.totalTokensUsed;
+
+      // Update last message with the assistant's response for real-time reactive subscription updates
       await ctx.runMutation(internal.system.conversations.updateLastMessage, {
         conversationId: conversation._id,
         lastMessageText: lastText,
-        lastMessageRole: response.text ? "assistant" : "user",
+        lastMessageRole: "assistant",
         lastMessageAt: Date.now(),
       });
 
@@ -209,7 +168,7 @@ export const create = action({
       await ctx.runMutation(internal.system.rateLimits.reconcileTokens, {
         organizationId: conversation.organizationId,
         estimatedTokensReserved: 600,
-        actualTokensUsed: inputTokens + outputTokens,
+        actualTokensUsed: totalTokensUsed,
       });
 
       // Asynchronously enqueue durable memory extraction job
@@ -222,16 +181,6 @@ export const create = action({
           conversationId: conversation._id,
           text: `Customer: ${cleanPrompt}\nAssistant: ${lastText}`,
         }),
-      });
-
-      // Asynchronously trigger LLM-as-a-Judge evaluation without blocking customer response
-      await ctx.scheduler.runAfter(0, internal.system.ai.evaluation.actions.evaluateInteraction, {
-        organizationId: conversation.organizationId,
-        conversationId: conversation._id,
-        threadId: args.threadId,
-        userQuestion: cleanPrompt,
-        agentAnswer: lastText,
-        toolsUsed: ["searchTool"],
       });
     } else {
       await saveMessage(ctx, components.agent, {
