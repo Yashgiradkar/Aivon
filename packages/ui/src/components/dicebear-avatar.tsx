@@ -15,6 +15,9 @@ interface DicebearAvatarProps {
   badgeImageUrl?: string;
 };
 
+// Global in-memory cache to prevent repeated SVG rendering & base64 conversions across list items
+const avatarDataUriCache = new Map<string, string>();
+
 export const DicebearAvatar = ({
   seed,
   size = 32,
@@ -28,12 +31,21 @@ export const DicebearAvatar = ({
       return imageUrl;
     }
 
+    const cleanSeed = seed.toLowerCase().trim();
+    const cacheKey = `${cleanSeed}-${size}`;
+    const cached = avatarDataUriCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const avatar = createAvatar(glass, {
-      seed: seed.toLowerCase().trim(),
+      seed: cleanSeed,
       size,
     });
 
-    return avatar.toDataUri();
+    const uri = avatar.toDataUri();
+    avatarDataUriCache.set(cacheKey, uri);
+    return uri;
   }, [seed, size, imageUrl]);
 
   const badgeSize = Math.round(size * 0.5);

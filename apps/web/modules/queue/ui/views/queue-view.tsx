@@ -25,6 +25,8 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import Link from "next/link";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
+import { Skeleton } from "@workspace/ui/components/skeleton";
+import { TechLoader } from "@/components/tech-loader";
 
 export const QueueView = () => {
   const queueEntries = useQuery(api.private.queue.getQueueList, { status: "all" });
@@ -125,7 +127,9 @@ export const QueueView = () => {
               <UsersIcon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{waitingEntries.length}</div>
+              <div className="text-2xl font-bold">
+                {queueEntries === undefined ? <Skeleton className="h-8 w-12" /> : waitingEntries.length}
+              </div>
               <p className="text-xs text-muted-foreground">Customers awaiting human assistance</p>
             </CardContent>
           </Card>
@@ -136,7 +140,9 @@ export const QueueView = () => {
               <RadioIcon className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{activeEntries.length}</div>
+              <div className="text-2xl font-bold text-green-600">
+                {queueEntries === undefined ? <Skeleton className="h-8 w-12" /> : activeEntries.length}
+              </div>
               <p className="text-xs text-muted-foreground">Calls currently in progress</p>
             </CardContent>
           </Card>
@@ -215,10 +221,19 @@ export const QueueView = () => {
         <div className="space-y-3">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <UsersIcon className="h-5 w-5 text-primary" />
-            Waiting Customers ({waitingEntries.length})
+            Waiting Customers ({queueEntries === undefined ? "..." : waitingEntries.length})
           </h2>
 
-          {waitingEntries.length === 0 ? (
+          {queueEntries === undefined ? (
+            <Card className="py-6">
+              <TechLoader
+                title="Loading Queue State"
+                description="Synchronizing active customer tickets and waiting sessions..."
+                compact
+                delayMs={100}
+              />
+            </Card>
+          ) : waitingEntries.length === 0 ? (
             <Card className="py-12 text-center text-muted-foreground">
               <CheckCircle2Icon className="mx-auto h-8 w-8 text-green-500 mb-2" />
               <p className="font-medium text-foreground">Queue is clear!</p>

@@ -27,23 +27,39 @@ export const getQueueList = query({
 
     const orgId = identity.orgId as string;
 
-    const entries = await ctx.db
-      .query("supportQueue")
-      .withIndex("by_organization_id", (q) => q.eq("organizationId", orgId))
-      .order("desc")
-      .collect();
-
-    if (!args.status || args.status === "all") {
-      return entries.filter(
-        (e) =>
-          e.status === "waiting" ||
-          e.status === "accepted" ||
-          e.status === "connecting" ||
-          e.status === "connected"
-      );
+    if (args.status && args.status !== "all") {
+      return await ctx.db
+        .query("supportQueue")
+        .withIndex("by_organization_id_and_status", (q) =>
+          q.eq("organizationId", orgId).eq("status", args.status as any)
+        )
+        .order("desc")
+        .collect();
     }
 
-    return entries.filter((e) => e.status === args.status);
+    // For "all" active items, leverage compound index by status to avoid scanning
+    // thousands of historical completed/expired entries
+    const activeStatuses: Array<"waiting" | "accepted" | "connecting" | "connected"> = [
+      "waiting",
+      "accepted",
+      "connecting",
+      "connected",
+    ];
+
+    const resultsByStatus = await Promise.all(
+      activeStatuses.map((st) =>
+        ctx.db
+          .query("supportQueue")
+          .withIndex("by_organization_id_and_status", (q) =>
+            q.eq("organizationId", orgId).eq("status", st)
+          )
+          .order("desc")
+          .take(100)
+      )
+    );
+
+    const merged = resultsByStatus.flat();
+    return merged.sort((a, b) => b.joinedAt - a.joinedAt);
   },
 });
 

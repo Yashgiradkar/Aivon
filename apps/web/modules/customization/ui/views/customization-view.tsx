@@ -2,7 +2,7 @@
 
 import { api } from "@workspace/backend/_generated/api";
 import { useQuery } from "convex/react";
-import { Loader2Icon } from "lucide-react";
+import { TechLoader } from "@/components/tech-loader";
 import { CustomizationForm } from "../components/customization-form";
 
 export const CustomizationView = () => {
@@ -13,9 +13,12 @@ export const CustomizationView = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-y-2 bg-muted p-8">
-        <Loader2Icon className="text-muted-foreground animate-spin" />
-        <p className="text-muted-foreground text-sm">Loading settings...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-muted p-8">
+        <TechLoader
+          title="Loading Widget Configuration"
+          description="Fetching live settings, suggestion chips, and voice routing..."
+          delayMs={100}
+        />
       </div>
     );
   }

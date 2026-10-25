@@ -16,6 +16,7 @@ const nextConfig = {
       "jotai",
       "@convex-dev/agent",
       "@convex-dev/rag",
+      "countries-and-timezones",
     ],
   },
   async redirects() {
@@ -28,6 +29,7 @@ const nextConfig = {
     ];
   },
   async headers() {
+    const clerkUrl = process.env.NEXT_PUBLIC_CLERK_FRONTEND_API_URL || "https://clerk.accounts.dev";
     return [
       {
         source: "/:path*",
@@ -37,9 +39,8 @@ const nextConfig = {
             value: "on",
           },
           {
-            // Allow browsers to prefetch linked pages
             key: "Link",
-            value: "<https://clerk.aivon.io>; rel=preconnect",
+            value: `<${clerkUrl}>; rel=preconnect`,
           },
         ],
       },

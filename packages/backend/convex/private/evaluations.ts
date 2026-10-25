@@ -72,7 +72,8 @@ export const getSummaryMetrics = query({
     const records = await ctx.db
       .query("evaluations")
       .withIndex("by_organization_id", (q) => q.eq("organizationId", orgId))
-      .collect();
+      .order("desc")
+      .take(500);
 
     if (records.length === 0) {
       return {

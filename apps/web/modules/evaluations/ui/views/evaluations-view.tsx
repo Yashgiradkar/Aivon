@@ -25,6 +25,7 @@ import {
 } from "@workspace/ui/components/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 import { Textarea } from "@workspace/ui/components/textarea";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 import {
   ShieldCheckIcon,
   AlertTriangleIcon,
@@ -97,7 +98,7 @@ export const EvaluationsView = () => {
           <CardHeader className="pb-2">
             <CardDescription className="text-xs font-medium">Avg Faithfulness</CardDescription>
             <CardTitle className="text-2xl font-bold flex items-center justify-between">
-              {metrics ? `${metrics.averageFaithfulness} / 5` : "..."}
+              {metrics ? `${metrics.averageFaithfulness} / 5` : <Skeleton className="h-7 w-16" />}
               <ShieldCheckIcon className="size-5 text-emerald-500" />
             </CardTitle>
           </CardHeader>
@@ -110,7 +111,7 @@ export const EvaluationsView = () => {
           <CardHeader className="pb-2">
             <CardDescription className="text-xs font-medium">Answer Relevance</CardDescription>
             <CardTitle className="text-2xl font-bold flex items-center justify-between">
-              {metrics ? `${metrics.averageAnswerRelevance} / 5` : "..."}
+              {metrics ? `${metrics.averageAnswerRelevance} / 5` : <Skeleton className="h-7 w-16" />}
               <SparklesIcon className="size-5 text-blue-500" />
             </CardTitle>
           </CardHeader>
@@ -123,7 +124,7 @@ export const EvaluationsView = () => {
           <CardHeader className="pb-2">
             <CardDescription className="text-xs font-medium">Context Relevance</CardDescription>
             <CardTitle className="text-2xl font-bold flex items-center justify-between">
-              {metrics ? `${metrics.averageContextRelevance} / 5` : "..."}
+              {metrics ? `${metrics.averageContextRelevance} / 5` : <Skeleton className="h-7 w-16" />}
               <FileTextIcon className="size-5 text-amber-500" />
             </CardTitle>
           </CardHeader>
@@ -136,7 +137,7 @@ export const EvaluationsView = () => {
           <CardHeader className="pb-2">
             <CardDescription className="text-xs font-medium">Citation Pass Rate</CardDescription>
             <CardTitle className="text-2xl font-bold flex items-center justify-between">
-              {metrics ? `${metrics.citationPassRate}%` : "..."}
+              {metrics ? `${metrics.citationPassRate}%` : <Skeleton className="h-7 w-16" />}
               <CheckCircle2Icon className="size-5 text-emerald-500" />
             </CardTitle>
           </CardHeader>
@@ -149,7 +150,7 @@ export const EvaluationsView = () => {
           <CardHeader className="pb-2">
             <CardDescription className="text-xs font-medium">Needs Human Review</CardDescription>
             <CardTitle className="text-2xl font-bold flex items-center justify-between text-amber-600">
-              {metrics ? metrics.needsReviewCount : "..."}
+              {metrics ? metrics.needsReviewCount : <Skeleton className="h-7 w-16" />}
               <AlertTriangleIcon className="size-5 text-amber-500" />
             </CardTitle>
           </CardHeader>
@@ -193,7 +194,20 @@ export const EvaluationsView = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {evaluations.results.length === 0 ? (
+              {evaluations.status === "LoadingFirstPage" ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-12 rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-12 rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-12 rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-14 ml-auto rounded-md" /></TableCell>
+                  </TableRow>
+                ))
+              ) : evaluations.results.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="h-32 text-center text-muted-foreground text-sm">
                     No evaluation records found yet. AI interactions will be continuously audited here.
