@@ -277,12 +277,13 @@ export const generateSummary = internalAction({
       });
 
       const transcript = (messagesData.page || [])
-        .map((m: { role?: string; content?: unknown }) => {
-          const role = m.role === "user" ? "Customer" : "Assistant";
+        .map((m) => {
+          const role = m.message?.role === "user" ? "Customer" : "Assistant";
           const text =
-            typeof m.content === "string"
-              ? m.content
-              : JSON.stringify(m.content ?? "");
+            m.text ??
+            (typeof m.message?.content === "string"
+              ? m.message.content
+              : JSON.stringify(m.message?.content ?? ""));
           return `${role}: ${text}`;
         })
         .join("\n")
