@@ -35,6 +35,7 @@ import { useMemo, useState } from "react";
 import { WidgetQueueBanner } from "../components/widget-queue-banner";
 import { WidgetCallbackDialog } from "../components/widget-callback-dialog";
 import { WidgetCallLogs } from "../components/widget-call-logs";
+import { WidgetSourceAttribution } from "../components/widget-source-attribution";
 import { HeadsetIcon, PhoneForwardedIcon, MessageSquareIcon, AlertCircleIcon } from "lucide-react";
 import { useMutation } from "convex/react";
 
@@ -193,10 +194,16 @@ export const WidgetChatScreen = () => {
       </WidgetHeader>
       <WidgetQueueBanner />
       {conversationId && contactSessionId && (
-        <WidgetCallLogs
-          conversationId={conversationId}
-          contactSessionId={contactSessionId}
-        />
+        <>
+          <WidgetCallLogs
+            conversationId={conversationId}
+            contactSessionId={contactSessionId}
+          />
+          <WidgetSourceAttribution
+            conversationId={conversationId}
+            contactSessionId={contactSessionId}
+          />
+        </>
       )}
       <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-1">

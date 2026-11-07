@@ -435,5 +435,86 @@ export default defineSchema({
     .index("by_organization_id", ["organizationId"])
     .index("by_booking_reference", ["bookingReference"])
     .index("by_idempotency_key", ["idempotencyKey"]),
+
+  aiAuditEvents: defineTable({
+    organizationId: v.string(),
+    traceId: v.string(),
+    conversationId: v.optional(v.id("conversations")),
+    threadId: v.optional(v.string()),
+    contactSessionId: v.optional(v.id("contactSessions")),
+    channel: v.union(
+      v.literal("chat"),
+      v.literal("voice"),
+      v.literal("operator"),
+      v.literal("system")
+    ),
+    eventType: v.string(), // "request.init", "auth.decision", "moderation.check", "rag.retrieval", "agent.execution", "llm.generation", "tts.synthesis", "security.violation", "error"
+    stage: v.string(),
+    status: v.union(
+      v.literal("success"),
+      v.literal("failed"),
+      v.literal("warning"),
+      v.literal("blocked")
+    ),
+    model: v.optional(v.string()),
+    latencyMs: v.optional(v.number()),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+    costUsd: v.optional(v.number()),
+    error: v.optional(v.string()),
+    metadata: v.optional(v.string()), // Serialized JSON of stage-specific metadata
+    timestamp: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_conversation_id", ["conversationId"])
+    .index("by_trace_id", ["traceId"])
+    .index("by_org_and_timestamp", ["organizationId", "timestamp"]),
+
+  ragLineageRecords: defineTable({
+    organizationId: v.string(),
+    traceId: v.string(),
+    conversationId: v.optional(v.id("conversations")),
+    threadId: v.optional(v.string()),
+    channel: v.union(
+      v.literal("chat"),
+      v.literal("voice"),
+      v.literal("operator")
+    ),
+    userQuery: v.string(),
+    effectiveStrategy: v.string(), // "dense" | "bm25" | "hybrid_rrf"
+    retrievedEvidence: v.array(
+      v.object({
+        evidenceId: v.string(),
+        documentId: v.string(),
+        documentName: v.string(),
+        pageNumber: v.optional(v.number()),
+        section: v.optional(v.string()),
+        chunkId: v.optional(v.string()),
+        contentType: v.string(), // "table" | "chart" | "prose" | "structured_data"
+        score: v.number(),
+        snippet: v.string(),
+        retrievalSource: v.string(), // "dense" | "bm25" | "hybrid_rrf"
+      })
+    ),
+    generatedResponse: v.string(),
+    speechFormattedResponse: v.optional(v.string()),
+    model: v.string(),
+    voiceMetadata: v.optional(
+      v.object({
+        provider: v.optional(v.string()), // "vapi" | "elevenlabs" | "web_speech"
+        voiceId: v.optional(v.string()),
+        modelId: v.optional(v.string()),
+        audioDurationSeconds: v.optional(v.number()),
+      })
+    ),
+    latencyMs: v.number(),
+    tokensUsed: v.number(),
+    hasEvidence: v.boolean(),
+    timestamp: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_conversation_id", ["conversationId"])
+    .index("by_trace_id", ["traceId"])
+    .index("by_org_and_timestamp", ["organizationId", "timestamp"]),
 });
 

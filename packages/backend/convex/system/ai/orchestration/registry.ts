@@ -69,11 +69,16 @@ export const KnowledgeRetrievalCapability: CapabilityDefinition = {
       });
 
       const citations: EvidenceCitation[] = retrieval.evidenceItems.map((item) => ({
-        documentId: item.sourceDoc,
+        evidenceId: item.evidenceId,
+        documentId: item.documentId || item.sourceDoc,
         documentName: item.sourceDoc,
+        pageNumber: item.pageNumber,
+        section: item.section,
+        chunkId: item.chunkId,
         snippet: item.text,
         score: item.score,
         format: (item.contentType as any) === "structured_data" ? "table" : (item.contentType as any) || "prose",
+        retrievalSource: item.retrievalSource,
       }));
 
       if (retrieval.evidenceItems.length === 0) {

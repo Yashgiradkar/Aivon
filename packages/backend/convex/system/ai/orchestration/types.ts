@@ -30,11 +30,16 @@ export type TaskOutcomeStatus =
   | "escalation_required";
 
 export interface EvidenceCitation {
+  evidenceId?: string;
   documentId: string;
   documentName: string;
+  pageNumber?: number;
+  section?: string;
+  chunkId?: string;
   snippet: string;
   score?: number;
   format?: "table" | "chart" | "prose" | "code";
+  retrievalSource?: string;
 }
 
 export interface NormalizedCapabilityResult {

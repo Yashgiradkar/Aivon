@@ -12,6 +12,9 @@ import { ModerationPipeline } from "../security";
 export interface EvidenceItem {
   evidenceId: string;
   sourceDoc: string;
+  documentId?: string;
+  pageNumber?: number;
+  chunkId?: string;
   contentType: "table" | "chart" | "structured_data" | "prose";
   section?: string;
   score: number;
@@ -321,12 +324,25 @@ export async function executeUnifiedRetrieval(
       contentType = "structured_data";
     }
 
-    const sectionMatch = text.match(/\[Section:\s*([^\]]+)\]/);
+    const sectionMatch = text.match(/\[Section:\s*([^\]]+)\]/i);
     const section = sectionMatch?.[1];
+
+    const pageMatch = text.match(
+      /(?:\[Page\s*[:#]?\s*(\d+)\]|<!--\s*page:\s*(\d+)\s*-->|===+\s*Page\s+(\d+)\s*===+)/i,
+    );
+    const pageNumber = pageMatch
+      ? parseInt(pageMatch[1] || pageMatch[2] || pageMatch[3] || "1", 10)
+      : undefined;
+
+    const chunkMatch = text.match(/\[Chunk\s*[:#]?\s*([^\]]+)\]/i);
+    const chunkId = chunkMatch?.[1] || `${entry.title || "doc"}_p${pageNumber ?? 1}_c${idx}`;
 
     return {
       evidenceId: `EVD-${idx + 1}`,
       sourceDoc: entry.title || "Knowledge Document",
+      documentId: entry.title || "Knowledge Document",
+      pageNumber,
+      chunkId,
       contentType,
       section,
       score: entry.score,
@@ -340,7 +356,7 @@ export async function executeUnifiedRetrieval(
   const formattedEvidenceText = evidenceItems
     .map(
       (e) =>
-        `[Evidence ${e.evidenceId}] (Source: "${e.sourceDoc}"${e.section ? `, Section: "${e.section}"` : ""}, Type: ${e.contentType}, Retrieval: ${e.retrievalSource}):\n${e.text}`
+        `[Evidence ${e.evidenceId}] (Source: "${e.sourceDoc}"${e.pageNumber ? `, Page: ${e.pageNumber}` : ""}${e.section ? `, Section: "${e.section}"` : ""}${e.chunkId ? `, Chunk: "${e.chunkId}"` : ""}, Type: ${e.contentType}, Retrieval: ${e.retrievalSource}):\n${e.text}`
     )
     .join("\n\n---\n\n");
 

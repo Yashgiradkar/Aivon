@@ -33,6 +33,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar";
 import { ConversationStatusButton } from "../components/conversation-status-button";
 import { ConversationCallLogs } from "../components/conversation-call-logs";
+import { ConversationSourceAttribution } from "../components/conversation-source-attribution";
 import { useState } from "react";
 import { cn } from "@workspace/ui/lib/utils";
 import { Skeleton } from "@workspace/ui/components/skeleton";
@@ -176,6 +177,7 @@ export const ConversationIdView = ({
       </header>
 
       <ConversationCallLogs conversationId={conversationId} />
+      <ConversationSourceAttribution conversationId={conversationId} />
 
       <AIConversation className="max-h-[calc(100vh-220px)]">
         <AIConversationContent>

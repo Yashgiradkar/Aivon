@@ -15,6 +15,7 @@ import type * as lib_requestSecurity from "../lib/requestSecurity.js";
 import type * as lib_secrets from "../lib/secrets.js";
 import type * as lib_uploadSecurity from "../lib/uploadSecurity.js";
 import type * as playground from "../playground.js";
+import type * as private_audit from "../private/audit.js";
 import type * as private_contactSessions from "../private/contactSessions.js";
 import type * as private_conversations from "../private/conversations.js";
 import type * as private_demo from "../private/demo.js";
@@ -28,6 +29,7 @@ import type * as private_secrets from "../private/secrets.js";
 import type * as private_vapi from "../private/vapi.js";
 import type * as private_voiceSettings from "../private/voiceSettings.js";
 import type * as private_widgetSettings from "../private/widgetSettings.js";
+import type * as public_audit from "../public/audit.js";
 import type * as public_contactSessions from "../public/contactSessions.js";
 import type * as public_conversations from "../public/conversations.js";
 import type * as public_messages from "../public/messages.js";
@@ -49,6 +51,7 @@ import type * as system_ai_evaluation_actions from "../system/ai/evaluation/acti
 import type * as system_ai_evaluation_index from "../system/ai/evaluation/index.js";
 import type * as system_ai_evaluation_judge from "../system/ai/evaluation/judge.js";
 import type * as system_ai_memory_memoryManager from "../system/ai/memory/memoryManager.js";
+import type * as system_ai_observability_auditMiddleware from "../system/ai/observability/auditMiddleware.js";
 import type * as system_ai_observability_costCalculator from "../system/ai/observability/costCalculator.js";
 import type * as system_ai_observability_index from "../system/ai/observability/index.js";
 import type * as system_ai_observability_logger from "../system/ai/observability/logger.js";
@@ -99,6 +102,7 @@ import type * as system_ai_travel_normalizer from "../system/ai/travel/normalize
 import type * as system_ai_travel_provider from "../system/ai/travel/provider.js";
 import type * as system_ai_travel_types from "../system/ai/travel/types.js";
 import type * as system_ai_travel_workflow from "../system/ai/travel/workflow.js";
+import type * as system_audit from "../system/audit.js";
 import type * as system_cache from "../system/cache.js";
 import type * as system_contactSessions from "../system/contactSessions.js";
 import type * as system_conversations from "../system/conversations.js";
@@ -138,6 +142,7 @@ declare const fullApi: ApiFromModules<{
   "lib/secrets": typeof lib_secrets;
   "lib/uploadSecurity": typeof lib_uploadSecurity;
   playground: typeof playground;
+  "private/audit": typeof private_audit;
   "private/contactSessions": typeof private_contactSessions;
   "private/conversations": typeof private_conversations;
   "private/demo": typeof private_demo;
@@ -151,6 +156,7 @@ declare const fullApi: ApiFromModules<{
   "private/vapi": typeof private_vapi;
   "private/voiceSettings": typeof private_voiceSettings;
   "private/widgetSettings": typeof private_widgetSettings;
+  "public/audit": typeof public_audit;
   "public/contactSessions": typeof public_contactSessions;
   "public/conversations": typeof public_conversations;
   "public/messages": typeof public_messages;
@@ -172,6 +178,7 @@ declare const fullApi: ApiFromModules<{
   "system/ai/evaluation/index": typeof system_ai_evaluation_index;
   "system/ai/evaluation/judge": typeof system_ai_evaluation_judge;
   "system/ai/memory/memoryManager": typeof system_ai_memory_memoryManager;
+  "system/ai/observability/auditMiddleware": typeof system_ai_observability_auditMiddleware;
   "system/ai/observability/costCalculator": typeof system_ai_observability_costCalculator;
   "system/ai/observability/index": typeof system_ai_observability_index;
   "system/ai/observability/logger": typeof system_ai_observability_logger;
@@ -222,6 +229,7 @@ declare const fullApi: ApiFromModules<{
   "system/ai/travel/provider": typeof system_ai_travel_provider;
   "system/ai/travel/types": typeof system_ai_travel_types;
   "system/ai/travel/workflow": typeof system_ai_travel_workflow;
+  "system/audit": typeof system_audit;
   "system/cache": typeof system_cache;
   "system/contactSessions": typeof system_contactSessions;
   "system/conversations": typeof system_conversations;

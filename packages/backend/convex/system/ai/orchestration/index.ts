@@ -7,6 +7,7 @@ import { ConversationRouter } from "./router";
 import { OrchestrationPlanner } from "./planner";
 import { OrchestrationExecutor } from "./executor";
 import { OrchestrationTelemetry } from "./observability";
+import { AuditMiddleware } from "../observability/auditMiddleware";
 import {
   CapabilityContext,
   OrchestrationRequest,
@@ -215,6 +216,35 @@ export async function orchestrateConversationTurn(
     tokensUsed: totalTokensUsed,
     routingCategory,
   });
+
+  if (finalResult.evidence && finalResult.evidence.length > 0) {
+    AuditMiddleware.recordLineage(ctx, {
+      organizationId: request.organizationId,
+      traceId,
+      conversationId: request.conversationId,
+      threadId: request.threadId,
+      channel: channel === "voice" ? "voice" : channel === "operator" ? "operator" : "chat",
+      userQuery: cleanPrompt,
+      effectiveStrategy: (finalResult.metadata?.strategy as string) || "hybrid_rrf",
+      retrievedEvidence: finalResult.evidence.map((ev, i) => ({
+        evidenceId: ev.evidenceId || `EVD-${i + 1}`,
+        documentId: ev.documentId || ev.documentName,
+        documentName: ev.documentName,
+        pageNumber: ev.pageNumber,
+        section: ev.section,
+        chunkId: ev.chunkId,
+        contentType: ev.format || "prose",
+        score: ev.score ?? 0.85,
+        snippet: ev.snippet,
+        retrievalSource: ev.retrievalSource || "hybrid_rrf",
+      })),
+      generatedResponse: responseText,
+      model: "gpt-4o-mini",
+      latencyMs: totalLatencyMs,
+      tokensUsed: totalTokensUsed,
+      hasEvidence: true,
+    });
+  }
 
   return {
     executionId: String(executionId),
