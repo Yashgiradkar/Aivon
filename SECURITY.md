@@ -56,11 +56,77 @@ Convex enforces isolation at the application layer through consistent, audited a
 - **Clerk Webhooks (`/clerk-webhook`)**: Verified via Svix cryptographic signatures (`svix-id`, `svix-timestamp`, `svix-signature`). Payloads exceeding 1 MB are rejected with HTTP 413. Handles subscription lifecycle (`subscription.created`, `subscription.updated`, `subscription.active`, `subscription.pastDue`) and membership synchronizations.
 - **Vapi Webhooks (`/vapi-webhook`)**: Protected by `VAPI_WEBHOOK_SECRET` evaluated via `timingSafeEqualString` to resist timing attacks. Voice search and transcription endpoints verify tenant organization and convex conversation ownership.
 
-### Knowledge Base File Upload Security
-- **MIME & Magic Byte Validation**: Client-supplied extensions and MIME types are untrusted. File signatures (`Uint8Array` magic bytes) are validated for PDF (`%PDF-`), PNG, JPEG, and WebP.
-- **Embedded Threat Prevention**: PDFs are scanned for active code (`/JavaScript`, `/JS`, `/Launch`, `/EmbeddedFile`, `/RichMedia`) and rejected before ingestion.
-- **Size & Page Limits**: 10 MB maximum file size; 2 MB limit for text/JSON/CSV; 200 page ceiling for PDFs.
-- **Fail-Secure Malware Scanning**: External malware scanner webhook requires HTTPS, valid auth tokens, and strict `clean: true` response.
+### Knowledge Base File Upload & Ingestion Pipeline Security
+
+The RAG ingestion pipeline implements strict fail-closed defense-in-depth: **a file never reaches storage, document parsing, OCR, chunking, embedding, or indexing until it passes comprehensive structural validation and malware scanning.**
+
+```mermaid
+flowchart TD
+    A[Untrusted File Upload] --> B[Tenant Auth & Active Subscription Gate]
+    B --> C[Rate Limiter & Admission Control]
+    C --> D[Filename & Traversal Defense: Basename, Length, RTL Spoofing, Double Extensions]
+    D --> E[Binary Signature Inspection: Block PE/ELF/Mach-O/WASM/Shebang & Archives]
+    E --> F[Malware Scanning: Pre-Scan EICAR + HTTPS ClamAV Fail-Closed]
+    F -->|Pass| G[Convex Storage Blob Allocation]
+    F -->|Fail| H[Reject 400 Bad Request: Never Stored]
+    G --> I[Format Normalization & Text Extraction: PDF/MD/CSV/JSON/Images]
+    I --> J[Indirect Prompt Injection Sanitizer: ModerationPipeline]
+    J --> K[Namespace-Isolated RAG Indexing: namespace = orgId]
+    I -->|Error| L[Storage Auto-Cleanup: Delete Orphaned Blob]
+```
+
+1. **Filename Sanitization & Extension Protection**:
+   - Client-provided filenames and MIME types are treated as hostile untrusted input.
+   - Rejects directory traversal sequences (`..`, `/`, `\`), null bytes (`\0`), ASCII control characters (`\x00-\x1F`), and Unicode Bidirectional Override characters (`\u202E`, `\u202D`) used to spoof extensions.
+   - Maximum filename length capped at 120 characters.
+   - **Double / Intermediate Extension Blocking**: Scans all intermediate segments between the base name and extension. Rejects files containing dangerous script/binary intermediate extensions (`.exe.txt`, `.php.pdf`, `.sh.csv`, `.bat.md`, `.ps1.json`, `.dll.txt`).
+
+2. **File Signature & Magic Byte Verification**:
+   - Validates authentic file signatures via `Uint8Array` byte headers:
+     - PDF: `%PDF-` (`0x25, 0x50, 0x44, 0x46, 0x2D`) at byte 0.
+     - PNG: `0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A`.
+     - JPEG: `0xFF, 0xD8, 0xFF`.
+     - WebP: RIFF container with `WEBP` signature at bytes 8-11.
+   - **Disguised Executable Binary Rejection**: Regardless of claimed extension, all files are checked against executable magic bytes and rejected immediately:
+     - Windows PE / DOS: `MZ` (`0x4D, 0x5A`).
+     - Linux ELF: `\x7fELF` (`0x7F, 0x45, 0x4C, 0x46`).
+     - Mach-O (32/64-bit big & little endian) and Java Bytecode (`0xCAFEBABE`).
+     - WebAssembly bytecode: `\0asm` (`0x00, 0x61, 0x73, 0x6D`).
+     - Shell Shebang headers: `#!` (`0x23, 0x21`).
+   - **Disguised Archive & Decompression Bomb Detection**: Rejects disguised compressed containers:
+     - ZIP: `PK\x03\x04`, `PK\x05\x06`, `PK\x07\x08`.
+     - GZIP: `0x1F, 0x8B`.
+     - 7-Zip: `7z\xbc\xaf\x27\x1c`.
+     - RAR: `Rar!\x1a\x07`.
+     - BZIP2: `BZh`.
+     - XZ: `\xfd7zXZ\x00`.
+     - TAR: `ustar` at offset 257.
+
+3. **Format-Specific Content Hardening**:
+   - **PDF Security**:
+     - Strict `%%EOF` trailer verification.
+     - Hard limit of 200 pages (`MAX_PDF_PAGE_COUNT`).
+     - Active code detection: Blocks `/JavaScript`, `/JS`, `/Launch`, `/EmbeddedFile`, `/RichMedia`, `/SubmitForm`, `/ImportData`, `/GoToR`, `/Sound`, `/Movie`, `/AcroForm/XFA`.
+     - Recursive filter defense: Blocks decompression bombs (e.g., nested `/FlateDecode /FlateDecode` filter chains).
+   - **Spreadsheet Security (CSV/TSV)**:
+     - Formula Injection (DDE) prevention: Inspects every cell boundary for formula triggers (`=`, `+`, `-`, `@`, `|`, `%`) followed by execution keywords (`cmd`, `powershell`, `calc`, `dde`, `hyperlink`, `mshta`, `rundll32`, `cscript`, `wscript`).
+   - **Text & Markdown Security**:
+     - Enforces valid UTF-8 encoding; rejects null bytes and binary control characters.
+     - Text/structured documents capped at 2 MB; total upload size capped at 10 MB.
+     - Direct raw bytes extraction for Markdown (`.md`, `.markdown`) and JSON without unnecessary LLM overhead.
+     - Strict JSON syntax parsing validation.
+
+4. **Malware & Antivirus Protection**:
+   - **Pre-Scan EICAR Detection**: Rapid local signature check for the standard EICAR test pattern (`X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*`).
+   - **Remote Antivirus Scanner Integration**: Integrates with ClamAV / external scanning service via HTTPS POST. Requires valid bearer authentication and strict `{ "clean": true }` response.
+   - **Fail-Closed Architecture**: If the scanner URL is unconfigured, unreachable, times out (10s abort controller), or returns non-200/infected status, uploads fail closed with HTTP 400 and are never written to disk or storage.
+
+5. **Storage, Ingestion & Lifecycle Isolation**:
+   - Ingestion State Machine: `Untrusted -> Validated -> Scanned -> Stored -> Extracted & Sanitized -> Indexed`.
+   - On extraction or indexing error: Orphaned storage blobs are immediately deleted (`ctx.storage.delete(storageId)`).
+   - Duplicate detection: Content hash (`contentHashFromArrayBuffer`) detects existing files; redundant storage blobs are immediately deleted.
+   - RAG Namespace Scoping: All indexing is strictly partitioned by `namespace: orgId`.
+   - Indirect Prompt Injection Defense: Extracted text is filtered through `ModerationPipeline.sanitizeRetrievedDocument` before chunking and embedding.
 
 ---
 

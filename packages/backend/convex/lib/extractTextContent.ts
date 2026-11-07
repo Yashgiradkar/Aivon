@@ -83,6 +83,12 @@ export async function extractTextContent(
   ) {
     rawExtractedText = await extractRawBytesText(ctx, storageId, bytes);
   } else if (
+    mimeType.toLowerCase().includes("markdown") ||
+    lowerFilename.endsWith(".md") ||
+    lowerFilename.endsWith(".markdown")
+  ) {
+    rawExtractedText = await extractRawBytesText(ctx, storageId, bytes);
+  } else if (
     mimeType.toLowerCase().includes("csv") ||
     lowerFilename.endsWith(".csv") ||
     lowerFilename.endsWith(".tsv")
@@ -138,7 +144,10 @@ async function extractTextFileContent(
 ): Promise<string> {
   const text = await extractRawBytesText(ctx, storageId, bytes);
 
-  if (mimeType.toLowerCase() !== "text/plain") {
+  if (
+    mimeType.toLowerCase() !== "text/plain" &&
+    mimeType.toLowerCase() !== "text/markdown"
+  ) {
     const result = await generateText({
       model: AI_MODELS.html,
       system: SYSTEM_PROMPTS.html,
