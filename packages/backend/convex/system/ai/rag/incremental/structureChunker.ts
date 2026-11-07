@@ -116,7 +116,9 @@ export class StructureChunker {
           // Paragraph itself exceeds maxChunkSize: slice on sentence boundaries
           const subChunks = this.splitLongText(block.content, maxChunkSize, overlapSize);
           for (let i = 0; i < subChunks.length; i++) {
-            currentChunkText = subChunks[i];
+            const subChunk = subChunks[i];
+            if (!subChunk) continue;
+            currentChunkText = subChunk;
             if (i < subChunks.length - 1) {
               flushChunk();
             }
@@ -221,6 +223,7 @@ export class StructureChunker {
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      if (line === undefined) continue;
       const trimmed = line.trim();
 
       // Code blocks
@@ -245,7 +248,7 @@ export class StructureChunker {
 
       // Headings: #, ##, ###
       const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
-      if (headingMatch) {
+      if (headingMatch && headingMatch[1] && headingMatch[2]) {
         flushParagraph();
         if (inTable) flushTable();
 

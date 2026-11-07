@@ -20,8 +20,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const clientKey =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
+  // Extract client IP safely (take first IP in comma-separated list, sanitize)
+  const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const realIp = req.headers.get("x-real-ip")?.trim();
+  const clientKey = (forwardedFor || realIp || "anonymous").replace(/[^a-zA-Z0-9.:_-]/g, "").slice(0, 64);
   if (isRateLimited(clientKey)) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

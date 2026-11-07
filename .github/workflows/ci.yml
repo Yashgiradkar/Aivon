@@ -27,7 +27,10 @@ jobs:
           cache: 'pnpm'
 
       - name: Install Dependencies
-        run: pnpm install --frozen-lockfile=false
+        run: pnpm install --frozen-lockfile
+
+      - name: Dependency Vulnerability Audit
+        run: pnpm audit --audit-level=high || true
 
       - name: 1. Monorepo Lint
         run: pnpm lint

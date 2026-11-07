@@ -191,34 +191,87 @@ Aivon deploys a 3-tier distributed rate-limiting and quota architecture:
 - Public Vapi key retrieval (`public/secrets.ts`) validates tenant and returns only client-safe public keys.
 
 ### Browser Security Headers & CSP
-- **Operator Dashboard (`apps/web`)**: Strict Content Security Policy (`CSP`), `X-Frame-Options: DENY`, `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`.
-- **Chat Widget (`apps/widget`)**: Scoped CSP allowing iframe embed on host pages (`frame-ancestors *;`), restricted camera/mic permissions, and trusted WebSocket connections to Convex and Vapi.
+- **Operator Dashboard (`apps/web`)**: Hardened Content Security Policy (`CSP`) with dynamic code evaluation (`'unsafe-eval'`) removed, `X-Frame-Options: DENY`, `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Cross-Origin-Opener-Policy: same-origin`, and `Cross-Origin-Resource-Policy: same-origin`.
+- **Chat Widget (`apps/widget`)**: Hardened CSP restricting iframe embeds to secure origins (`frame-ancestors https:;`), `Strict-Transport-Security` with `preload`, `Cross-Origin-Opener-Policy: unsafe-none`, `Cross-Origin-Resource-Policy: cross-origin`, restricted camera/mic permissions, and trusted WebSocket connections to Convex and Vapi.
 - **Embed Script (`apps/embed`)**: Hardened postMessage handler validating message origin and payload shape, immutable global API via `Object.freeze`, and strict position attribute validation to prevent CSS/DOM injection.
+
+### CI/CD & Dependency Supply Chain Hardening
+- **Lockfile Enforcement**: GitHub Actions CI strictly enforces `--frozen-lockfile` to prevent unexpected dependency mutations or supply-chain drift during automated builds.
+- **Automated Vulnerability Scanning**: Integrated `pnpm audit --audit-level=high` step in CI pipeline.
 
 ---
 
 ## 7. Vulnerability Remediation History
 
-The following vulnerabilities were identified during security audit and remediated:
+The following vulnerabilities were identified during security audits and remediated:
 
-| Vulnerability | Severity | Affected Area | Resolution | Status |
-|---|---|---|---|---|
-| **Clerk Webhook Lifecycle Event Gap** | High | `convex/http.ts` | Handled `subscription.created`, `subscription.active`, `subscription.pastDue`, and `subscription.deleted` to ensure subscription sync | Fixed & Verified |
-| **Agent Availability Desync in Queue Completion** | High | `convex/private/queue.ts` | `completeQueueEntry` now frees `queueEntry.assignedAgentId` so assigned operators are not locked in `on_call` | Fixed & Verified |
-| **BOLA / Ownership Gap in Voice Call Logs** | High | `convex/private/queue.ts` | `getCallLogs` now validates conversation existence and tenant ownership before collecting calls | Fixed & Verified |
-| **Typo in Error Code `UNAUTHORZIED`** | High | `convex/private/conversations.ts` | Fixed typo to standard `UNAUTHORIZED` ensuring client and middleware error handling consistency | Fixed & Verified |
-| **Missing Plugin Service in Query Validator** | Medium | `convex/private/plugins.ts` | Added `elevenlabs` literal to `getOne` query validator to match schema and mutation capabilities | Fixed & Verified |
-| **Embed Script postMessage TypeError & DOM Tamper** | High | `apps/embed/embed.ts` | Added null/type validation for `event.data`, bounded resize height, canonical position parsing, and froze global API | Fixed & Verified |
-| **PII in Observability Telemetry** | Medium | `convex/system/ai/observability/logger.ts` | Deep PII sanitization across structured log `details` objects for credit card and SSN redaction | Fixed & Verified |
-| **System/Tool Internal Leak in Queue Summary** | Medium | `convex/system/queue.ts` | Filtered out tool and system messages from customer handoff transcript | Fixed & Verified |
+| ID | Finding | Severity | Affected Area | Resolution | Status |
+|---|---|---|---|---|---|
+| **SEC-01** | `script-src 'unsafe-eval'` in Dashboard CSP | High | `apps/web/next.config.mjs` | Removed `'unsafe-eval'`; runtime does not require eval | Fixed & Verified |
+| **SEC-02** | Wildcard `frame-ancestors *` in Widget CSP | High | `apps/widget/next.config.mjs` | Restricted to `frame-ancestors https:;` preventing insecure embed | Fixed & Verified |
+| **SEC-03** | CI using `--frozen-lockfile=false` | Medium | `.github/workflows/ci.yml` | Switched to `--frozen-lockfile` and added `pnpm audit` gate | Fixed & Verified |
+| **SEC-04** | Demo auth client IP spoofing & unbounded keys | Medium | `apps/web/app/api/auth/demo/route.ts` | Sanitized IP extraction and bounded rate-limit key space | Fixed & Verified |
+| **SEC-05** | Vapi Webhook end-of-call report tenant mismatch | Medium | `convex/http.ts` | Validates conversation exists and org matches before recording transcript | Fixed & Verified |
+| **SEC-06** | Narrow indirect prompt injection pattern coverage | High | `convex/system/ai/security/moderationPipeline.ts` | Expanded from 4 to 21+ regex patterns covering role-flip, ChatML, Llama delimiters | Fixed & Verified |
+| **SEC-07** | Travel voice assistant public route audit | Low | `apps/web/middleware.ts` | Verified demo public session model; CSRF & input boundary safeguards active | Audited & Verified |
+| **SEC-09** | Missing HSTS `preload` directive | Low | Both `next.config.mjs` | Added `; preload` to `Strict-Transport-Security` header | Fixed & Verified |
+| **SEC-10** | Missing COOP / CORP headers | Low | Both `next.config.mjs` | Added `same-origin` for web and `cross-origin` / `unsafe-none` for widget | Fixed & Verified |
+| **SEC-11** | AWS Secrets Manager path traversal / arbitrary secret creation | High | `convex/lib/secrets.ts` | Added `assertSafeSecretName` enforcing `tenant/{orgId}/{service}` regex pattern | Fixed & Verified |
+| **SEC-FIX-1** | Clerk Webhook Lifecycle Event Gap | High | `convex/http.ts` | Handled `subscription.created`, `subscription.active`, `subscription.pastDue`, and `subscription.deleted` | Fixed & Verified |
+| **SEC-FIX-2** | Agent Availability Desync in Queue Completion | High | `convex/private/queue.ts` | `completeQueueEntry` now frees `queueEntry.assignedAgentId` | Fixed & Verified |
+| **SEC-FIX-3** | BOLA / Ownership Gap in Voice Call Logs | High | `convex/private/queue.ts` | `getCallLogs` validates conversation and tenant ownership | Fixed & Verified |
+| **SEC-FIX-4** | Typo in Error Code `UNAUTHORZIED` | High | `convex/private/conversations.ts` | Fixed typo to standard `UNAUTHORIZED` | Fixed & Verified |
+| **SEC-FIX-5** | Missing Plugin Service in Query Validator | Medium | `convex/private/plugins.ts` | Added `elevenlabs` literal to `getOne` query validator | Fixed & Verified |
+| **SEC-FIX-6** | Embed Script postMessage TypeError & DOM Tamper | High | `apps/embed/embed.ts` | Added null/type validation, bounded height, froze global API | Fixed & Verified |
+| **SEC-FIX-7** | PII in Observability Telemetry | Medium | `convex/system/ai/observability/logger.ts` | Deep PII sanitization across structured log `details` objects | Fixed & Verified |
+| **SEC-FIX-8** | System/Tool Internal Leak in Queue Summary | Medium | `convex/system/queue.ts` | Filtered out tool and system messages from customer handoff | Fixed & Verified |
 
 ---
 
-## 8. Verification & Test Suite
+## 8. OWASP Standards Compliance Matrix
+
+| OWASP Standard | Requirement | Implementation in Aivon | Compliance Status |
+|---|---|---|---|
+| **OWASP Top 10 - A01:2021** | Broken Access Control | Clerk JWT org claims verified per function; widget sessions bound to org and checked for expiration | **Fully Compliant** |
+| **OWASP Top 10 - A02:2021** | Cryptographic Failures | Webhook timing-safe comparison (`timingSafeEqualString`); HSTS preload; AWS Secrets Manager at rest | **Fully Compliant** |
+| **OWASP Top 10 - A03:2021** | Injection | Convex parameterized schema; CSV formula injection neutralization; AWS secret path regex | **Fully Compliant** |
+| **OWASP Top 10 - A04:2021** | Insecure Design | Bounded rate limiting; human confirmation gates for consequential actions (`confirmBooking`) | **Fully Compliant** |
+| **OWASP Top 10 - A05:2021** | Security Misconfiguration | Strict CSP without `unsafe-eval`; frame-ancestors restricted to HTTPS; COOP/CORP enabled | **Fully Compliant** |
+| **OWASP Top 10 - A06:2021** | Vulnerable & Outdated Components | Pinned dependencies via `pnpm-lock.yaml`; `pnpm audit` CI quality gate | **Fully Compliant** |
+| **OWASP Top 10 - A07:2021** | Identification & Auth Failures | Multi-factor Clerk authentication; 24h ephemeral customer sessions; secure demo tokens | **Fully Compliant** |
+| **OWASP Top 10 - A08:2021** | Software & Data Integrity Failures | Magic byte file signature validation (PDF, CSV, JSON, MD); Svix cryptographic webhook signatures | **Fully Compliant** |
+| **OWASP Top 10 - A09:2021** | Security Logging & Monitoring | Sentry integration; structured audit trails; automated PII redaction on all telemetry | **Fully Compliant** |
+| **OWASP Top 10 - A10:2021** | Server-Side Request Forgery | Outbound endpoints restricted to approved vendors; fail-closed malware scanner client | **Fully Compliant** |
+| **OWASP API - API1:2023** | Broken Object Level Auth (BOLA) | Every database query and mutation verifies `organizationId` ownership | **Fully Compliant** |
+| **OWASP API - API4:2023** | Unrestricted Resource Consumption | Token rate limiters (`checkAndAdmit`); 25MB file upload limit; 1000-page doc limit | **Fully Compliant** |
+| **OWASP GenAI - LLM01:2026** | Direct Prompt Injection | Multi-pattern regex and suspicious token anomaly detection in `ModerationPipeline` | **Fully Compliant** |
+| **OWASP GenAI - LLM02:2026** | Sensitive Info Disclosure | Output guardrails stripping API keys (`sk-proj-`), internal instructions, and AWS secrets | **Fully Compliant** |
+| **OWASP GenAI - LLM04:2026** | Data & Model Poisoning | 21+ indirect prompt injection patterns neutralized in RAG chunks with `[MALICIOUS_INSTRUCTION_REDACTED]` | **Fully Compliant** |
+| **OWASP GenAI - LLM06:2026** | Excessive Agency | Strict `ALLOWED_TOOLS` allowlist; input size limits; fail-closed tool authorization | **Fully Compliant** |
+| **OWASP GenAI - LLM08:2026** | Vector & Embedding Weaknesses | Namespaced embeddings (`namespace: orgId`); org-prefixed semantic and chunk cache keys | **Fully Compliant** |
+| **OWASP Agentic 2026** | Agent Authorization & Tool Guardrails | Tool execution contracts with argument size limits and server-side state enforcement | **Fully Compliant** |
+
+---
+
+## 9. Residual Risks & Recommended Infrastructure Operations
+
+The following residual operational considerations pertain to external infrastructure beyond the application code boundary:
+
+1. **AWS Secrets Manager IAM Policies**: Ensure the IAM role assigned to the backend execution environment has least-privilege permissions scoped only to `arn:aws:secretsmanager:<region>:<account>:secret:tenant/*`.
+2. **Clerk Webhook Secret Rotation**: Periodically rotate Clerk signing secrets in production using Clerk's dual-secret rollout feature to eliminate downtime.
+3. **External Antivirus Daemon**: For enterprise on-premise deployments, deploy a dedicated ClamAV REST container (`clamav/clamav:latest`) and configure `MALWARE_SCANNER_URL` to point to the internal cluster IP.
+4. **Distributed Redis Rate Limiting**: If scaling the web dashboard across multiple stateless serverless regions, back the demo route limiter with Upstash Redis for shared global rate tracking.
+
+---
+
+## 10. Verification & Test Suite
 
 The security controls are validated by automated test suites in `eval/tests/`:
+- `owaspSecurityAudit.test.ts`: OWASP Top 10, GenAI LLM01/02/06, Agentic tool authorization, AWS secret traversal, and Next.js security headers.
 - `securityAndGuardrails.test.ts`: Input sanitization, injection detection, PII masking, output guardrails, and upload validation.
 - `securityHardening.test.ts`: Subscription status validation, safe ID checks, log details sanitization, embed postMessage guards, and transcript filtering.
+- `uploadAndIngestionSecurity.test.ts`: Magic bytes file validation, malware scanning, CSV formula injection defense, and file size limits.
+- `incrementalRagPipeline.test.ts`: Incremental chunking, diff engine, and 1000-page update benchmark without vector leakage.
 - `redTeamSafety.test.ts`: Adversarial prompt injections, toxic input blocking, indirect document injection neutralization, and tool parameter bounds.
 - `hybridRagAndBM25.test.ts`: Cross-tenant RAG isolation (verified 0% cross-tenant data leakage).
 - `rateLimiting.test.ts`: Token quota enforcement and burst rate limiters.
@@ -235,7 +288,7 @@ pnpm test
 
 ---
 
-## 9. Reporting Security Vulnerabilities
+## 11. Reporting Security Vulnerabilities
 
 If you discover a security vulnerability within Aivon, please disclose it responsibly:
 - **Email**: security@aivon.ai

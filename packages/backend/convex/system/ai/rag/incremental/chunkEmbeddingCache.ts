@@ -148,7 +148,9 @@ export class ChunkEmbeddingCache {
     const toRemove = Math.ceil(this.MAX_ENTRIES * 0.1);
 
     for (let i = 0; i < toRemove && i < sorted.length; i++) {
-      const [oldestKey] = sorted[i];
+      const entry = sorted[i];
+      if (!entry) continue;
+      const [oldestKey] = entry;
       this.cache.delete(oldestKey);
       this.accessOrder.delete(oldestKey);
     }

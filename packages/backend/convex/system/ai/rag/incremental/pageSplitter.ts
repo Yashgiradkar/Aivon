@@ -106,7 +106,9 @@ export class PageSplitter {
 
     for (let i = 0; i < matches.length; i++) {
       const m = matches[i];
-      const nextIndex = i + 1 < matches.length ? matches[i + 1].index : text.length;
+      if (!m) continue;
+      const nextMatch = i + 1 < matches.length ? matches[i + 1] : undefined;
+      const nextIndex = nextMatch ? nextMatch.index : text.length;
       const content = text.slice(m.index + m.length, nextIndex).trim();
 
       if (content.length > 0) {
@@ -158,12 +160,15 @@ export class PageSplitter {
     const pages: PageUnit[] = [];
 
     for (let i = 0; i < matches.length; i++) {
-      const startIndex = matches[i].index!;
-      const endIndex = i + 1 < matches.length ? matches[i + 1].index! : text.length;
+      const cur = matches[i];
+      if (!cur || cur.index === undefined) continue;
+      const startIndex = cur.index;
+      const nextMatch = i + 1 < matches.length ? matches[i + 1] : undefined;
+      const endIndex = nextMatch && nextMatch.index !== undefined ? nextMatch.index : text.length;
       const sectionText = text.slice(startIndex, endIndex).trim();
 
       const titleMatch = sectionText.match(/^#\s+([^\n]+)/);
-      const title = titleMatch ? titleMatch[1].trim() : undefined;
+      const title = titleMatch && titleMatch[1] ? titleMatch[1].trim() : undefined;
       const pageNum = i + 1;
 
       pages.push({

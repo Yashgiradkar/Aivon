@@ -125,6 +125,7 @@ export class IncrementalRAGPipeline {
       for (let i = 0; i < missingChunksToEmbed.length; i++) {
         const chunk = missingChunksToEmbed[i];
         const vector = vectors[i];
+        if (!chunk || !vector) continue;
         chunk.embedding = vector;
         ChunkEmbeddingCache.set(organizationId, chunk.chunkHash, vector);
         newEmbeddingsGenerated++;

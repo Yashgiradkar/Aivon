@@ -49,13 +49,19 @@ const nextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           {
             key: "Strict-Transport-Security",
-            value: "max-age=31536000; includeSubDomains",
+            // SEC-09: added 'preload' directive for HSTS preload list submission
+            value: "max-age=31536000; includeSubDomains; preload",
           },
+          // SEC-10: Cross-Origin isolation headers
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
           {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${clerkUrl} https://*.clerk.accounts.dev https://challenges.cloudflare.com`,
+              // Dynamic code evaluation removed (SEC-01): Next.js + Clerk do not require eval at runtime.
+              // 'unsafe-inline' retained for Clerk component styling compatibility.
+              `script-src 'self' 'unsafe-inline' ${clerkUrl} https://*.clerk.accounts.dev https://challenges.cloudflare.com`,
               `connect-src 'self' ${clerkUrl} https://*.clerk.accounts.dev ${process.env.NEXT_PUBLIC_CONVEX_URL ?? ""} https://*.convex.cloud https://*.convex.site wss://*.convex.cloud https://*.sentry.io`,
               "img-src 'self' data: blob: https:",
               "style-src 'self' 'unsafe-inline'",

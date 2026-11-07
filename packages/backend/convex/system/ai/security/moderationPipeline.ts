@@ -58,11 +58,35 @@ export class ModerationPipeline {
   ];
 
   // Indirect injection patterns inside external files / retrieved docs
+  // SEC-06: Expanded from 4 to 20+ patterns covering common LLM injection vectors
+  // per OWASP GenAI Top 10 (LLM02) and OWASP LLM Red Teaming Guide.
   private static INDIRECT_INJECTION_PATTERNS = [
+    // Original patterns
     /\[System\s*Message\s*:\s*Ignore/i,
     /<!--\s*ai-instruction\s*:\s*override/i,
     /system\s*instructions\s*have\s*changed/i,
     /assistant\s*must\s*now\s*output/i,
+    // Role-flip and jailbreak variants
+    /you\s+are\s+now\s+(?:DAN|an\s+AI\s+without\s+restrictions)/i,
+    /forget\s+(all\s+)?(previous|prior|your)\s+(instructions|constraints|rules|training)/i,
+    /ignore\s+(all\s+)?(previous|prior|above)\s+(instructions|prompts|rules)/i,
+    /new\s+instructions?\s*:/i,
+    /override\s+(all\s+)?(safety|previous)\s+(guidelines?|instructions?|rules?)/i,
+    // Delimiter-based context smuggling (Claude, GPT, Llama, Mistral patterns)
+    /<\|im_start\|>\s*system/i,
+    /<\|SYSTEM\|>/i,
+    /\[INST\]/i,
+    /<<SYS>>/i,
+    /\n\s*---\s*\n\s*(new\s+task|system\s+message|instructions?)[\s:]/i,
+    /\n\s*(Human|User)\s*:\s*ignore/i,
+    /\n\s*Assistant\s*:\s*(sure|of\s+course|i\s+will)/i,
+    // Comment-hidden injection in documents
+    /<!--\s*SYSTEM\s*:/i,
+    /\/\*\s*SYSTEM\s*:/i,
+    // Exfiltration and leakage attempts
+    /repeat\s+(everything\s+)?(above|before|back)\s+(to\s+me|verbatim)/i,
+    /print\s+your\s+(system\s+prompt|instructions|initial\s+prompt)/i,
+    /output\s+(your\s+)?(full\s+)?(system\s+prompt|original\s+instructions)/i,
   ];
 
   /**
