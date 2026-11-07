@@ -63,6 +63,13 @@ import type * as system_ai_orchestration_types from "../system/ai/orchestration/
 import type * as system_ai_rag_bm25 from "../system/ai/rag/bm25.js";
 import type * as system_ai_rag_corpus from "../system/ai/rag/corpus.js";
 import type * as system_ai_rag_fusion from "../system/ai/rag/fusion.js";
+import type * as system_ai_rag_incremental_chunkEmbeddingCache from "../system/ai/rag/incremental/chunkEmbeddingCache.js";
+import type * as system_ai_rag_incremental_diffEngine from "../system/ai/rag/incremental/diffEngine.js";
+import type * as system_ai_rag_incremental_incrementalPipeline from "../system/ai/rag/incremental/incrementalPipeline.js";
+import type * as system_ai_rag_incremental_index from "../system/ai/rag/incremental/index.js";
+import type * as system_ai_rag_incremental_manifestStore from "../system/ai/rag/incremental/manifestStore.js";
+import type * as system_ai_rag_incremental_pageSplitter from "../system/ai/rag/incremental/pageSplitter.js";
+import type * as system_ai_rag_incremental_structureChunker from "../system/ai/rag/incremental/structureChunker.js";
 import type * as system_ai_rag_incremental_types from "../system/ai/rag/incremental/types.js";
 import type * as system_ai_rag_index from "../system/ai/rag/index.js";
 import type * as system_ai_rag_queryNormalizer from "../system/ai/rag/queryNormalizer.js";
@@ -179,6 +186,13 @@ declare const fullApi: ApiFromModules<{
   "system/ai/rag/bm25": typeof system_ai_rag_bm25;
   "system/ai/rag/corpus": typeof system_ai_rag_corpus;
   "system/ai/rag/fusion": typeof system_ai_rag_fusion;
+  "system/ai/rag/incremental/chunkEmbeddingCache": typeof system_ai_rag_incremental_chunkEmbeddingCache;
+  "system/ai/rag/incremental/diffEngine": typeof system_ai_rag_incremental_diffEngine;
+  "system/ai/rag/incremental/incrementalPipeline": typeof system_ai_rag_incremental_incrementalPipeline;
+  "system/ai/rag/incremental/index": typeof system_ai_rag_incremental_index;
+  "system/ai/rag/incremental/manifestStore": typeof system_ai_rag_incremental_manifestStore;
+  "system/ai/rag/incremental/pageSplitter": typeof system_ai_rag_incremental_pageSplitter;
+  "system/ai/rag/incremental/structureChunker": typeof system_ai_rag_incremental_structureChunker;
   "system/ai/rag/incremental/types": typeof system_ai_rag_incremental_types;
   "system/ai/rag/index": typeof system_ai_rag_index;
   "system/ai/rag/queryNormalizer": typeof system_ai_rag_queryNormalizer;
