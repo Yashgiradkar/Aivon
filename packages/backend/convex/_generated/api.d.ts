@@ -63,6 +63,7 @@ import type * as system_ai_orchestration_types from "../system/ai/orchestration/
 import type * as system_ai_rag_bm25 from "../system/ai/rag/bm25.js";
 import type * as system_ai_rag_corpus from "../system/ai/rag/corpus.js";
 import type * as system_ai_rag_fusion from "../system/ai/rag/fusion.js";
+import type * as system_ai_rag_incremental_types from "../system/ai/rag/incremental/types.js";
 import type * as system_ai_rag_index from "../system/ai/rag/index.js";
 import type * as system_ai_rag_queryNormalizer from "../system/ai/rag/queryNormalizer.js";
 import type * as system_ai_rag_queryRouter from "../system/ai/rag/queryRouter.js";
@@ -178,6 +179,7 @@ declare const fullApi: ApiFromModules<{
   "system/ai/rag/bm25": typeof system_ai_rag_bm25;
   "system/ai/rag/corpus": typeof system_ai_rag_corpus;
   "system/ai/rag/fusion": typeof system_ai_rag_fusion;
+  "system/ai/rag/incremental/types": typeof system_ai_rag_incremental_types;
   "system/ai/rag/index": typeof system_ai_rag_index;
   "system/ai/rag/queryNormalizer": typeof system_ai_rag_queryNormalizer;
   "system/ai/rag/queryRouter": typeof system_ai_rag_queryRouter;

@@ -1,4 +1,4 @@
-import { ConvexError, v } from "convex/values";
+import { ConvexError, v, type Value } from "convex/values";
 import {
   contentHashFromArrayBuffer,
   Entry,
@@ -17,6 +17,11 @@ import {
   scanUploadForMalware,
   validateKnowledgeBaseUpload,
 } from "../lib/uploadSecurity";
+import {
+  IncrementalRAGPipeline,
+  DocumentManifestStore,
+  ChunkEmbeddingCache,
+} from "../system/ai/rag/incremental";
 
 export const deleteFile = mutation({
   args: {
@@ -77,6 +82,14 @@ export const deleteFile = mutation({
     await rag.deleteAsync(ctx, {
       entryId: args.entryId,
     });
+
+    if (entry.key) {
+      DocumentManifestStore.delete(orgId, entry.key);
+      ChunkEmbeddingCache.pruneStale(
+        orgId,
+        DocumentManifestStore.getActiveChunkHashes(orgId),
+      );
+    }
 
     // Invalidate both the BM25 index and the retrieval result cache so stale
     // answers are not served after the document has been permanently deleted.
@@ -162,6 +175,8 @@ export const addFile = action({
     let text: string;
     let entryId: EntryId;
     let created: boolean;
+    let replacedEntry: Entry<Record<string, Value>, Record<string, Value>> | null =
+      null;
 
     try {
       text = await extractTextContent(ctx, {
@@ -171,11 +186,28 @@ export const addFile = action({
         mimeType,
       });
 
+      // Incremental processing: Page-aware diffing, structure-aware chunking,
+      // and selective embedding generation. Unchanged chunks have pre-computed
+      // embeddings attached so @convex-dev/rag skips embedMany completely.
+      const incrementalResult = await IncrementalRAGPipeline.processDocument(
+        text,
+        {
+          organizationId: orgId,
+          documentKey: filename,
+          filename,
+          mimeType,
+        },
+      );
+
+      const inputChunks = IncrementalRAGPipeline.toRAGInputChunks(
+        incrementalResult.chunks,
+      );
+
       const result = await rag.add(ctx, {
         // SUPER IMPORTANT: What search space to add this to. You cannot search across namespaces,
         // If not added, it will be considered global (we do not want this)
         namespace: orgId,
-        text,
+        chunks: inputChunks,
         key: filename,
         title: filename,
         metadata: {
@@ -184,10 +216,11 @@ export const addFile = action({
           filename,
           category: category ?? null,
         } as EntryMetadata,
-        contentHash: await contentHashFromArrayBuffer(bytes), // To avoid re-inserting if the file content hasn't changed
+        contentHash: incrementalResult.documentHash,
       });
       entryId = result.entryId;
       created = result.created;
+      replacedEntry = result.replacedEntry;
     } catch (err) {
       // If extraction or indexing fails, clean up the orphaned storage object
       // so it doesn't leak in Convex file storage.
@@ -218,6 +251,23 @@ export const addFile = action({
         url: null,
         entryId,
       };
+    }
+
+    // If an existing version was replaced, clean up its prior storage blob
+    if (
+      replacedEntry?.metadata?.storageId &&
+      replacedEntry.metadata.storageId !== storageId
+    ) {
+      try {
+        await ctx.storage.delete(
+          replacedEntry.metadata.storageId as Id<"_storage">,
+        );
+      } catch (cleanupErr) {
+        console.warn(
+          "[addFile] Failed to clean up previous storage blob:",
+          cleanupErr,
+        );
+      }
     }
 
     // Invalidate both caches so the new document is immediately available.

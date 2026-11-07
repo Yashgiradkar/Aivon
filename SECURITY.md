@@ -42,7 +42,9 @@ Convex enforces isolation at the application layer through consistent, audited a
    - Vector embeddings are indexed in `@convex-dev/rag` with explicit `namespace: orgId`.
    - BM25 inverted lexical indices are built strictly per-tenant from `internal.system.ai.rag.corpus.getTenantCorpus`.
    - `MultiTenantRetrievalCache` prefixes all in-memory cache keys with `orgId:`.
-   - Guaranteed 0% cross-tenant data leakage across vector, BM25, and semantic cache lookups.
+   - `ChunkEmbeddingCache` content-addressable storage keys embeddings with `organizationId:chunkHash`, guaranteeing zero cross-tenant vector leakage.
+   - `DocumentManifestStore` tracks revision manifests and SHA-256 page checksums strictly scoped per organization.
+   - Guaranteed 0% cross-tenant data leakage across vector, BM25, semantic cache, and chunk embedding lookups.
 
 4. **Secret Storage Isolation**:
    - AWS Secrets Manager keys adhere strictly to `tenant/{organizationId}/{service}` hierarchy.
