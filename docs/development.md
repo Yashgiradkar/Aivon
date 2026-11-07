@@ -279,7 +279,41 @@ modules/<feature>/
 
 ## Branch / PR Expectations
 
-No CI/CD configuration files were found in the repository. Branch and PR conventions are not codified in the codebase.
+GitHub Actions CI (`.github/workflows/ci.yml`) runs on push and pull requests to `main` and `feature/*` branches:
+- Dependency validation using `pnpm install --frozen-lockfile`
+- Security vulnerability auditing using `pnpm audit`
+- TypeScript type-checking across apps and Convex backend
+- Monorepo test suite execution (`pnpm test` running 23 test suites)
+
+---
+
+## Testing & Quality Assurance
+
+Aivon provides 23 automated, standalone test suites executed via `pnpm test` (using `tsx` with `node:assert/strict`):
+
+```bash
+# Run all 23 test suites
+pnpm test
+
+# Run security and guardrail tests
+pnpm test:security
+
+# Run travel agent normalizer and workflow tests
+pnpm test:travel
+```
+
+Key test suites include:
+- `eval/tests/securityAndGuardrails.test.ts` — Prompt injection, PII redaction, output safety
+- `eval/tests/securityHardening.test.ts` — Authentication bounds, CSP, and permission controls
+- `eval/tests/uploadAndIngestionSecurity.test.ts` — MIME spoofing, magic bytes, EICAR antivirus, decompression bombs
+- `eval/tests/owaspSecurityAudit.test.ts` — OWASP GenAI Top 10, ASVS, and agent authorization
+- `eval/tests/auditTrailAndDataLineage.test.ts` — Correlated trace IDs, RAG chunk attribution, voice lineage
+- `eval/tests/applicationLimits.test.ts` — Operational boundaries, text limits, rate limit windows, upload budgets
+- `eval/tests/incrementalRagPipeline.test.ts` — SHA-256 content hashing, structure chunking, cache preservation
+- `eval/tests/rateLimiting.test.ts` — Tiered token quotas, concurrency admission, quota rollover
+- `eval/tests/voiceAndElevenLabs.test.ts` — Speech formatting, ElevenLabs parameters, multilingual voice synthesis
+- `eval/tests/queueWorkflow.test.ts` — FIFO priority matching, presence tracking, atomic reservation
+- `eval/tests/travelNormalizer.test.ts` & `travelWorkflow.test.ts` — Voice slot extraction and booking state machines
 
 ---
 

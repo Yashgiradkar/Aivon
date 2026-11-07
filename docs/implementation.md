@@ -589,3 +589,26 @@ Key assertions validated:
 - Speech correction (`Mumbai—sorry, Pune`) resolves to `Pune`
 - `"start over"` resets all slots and transitions to `COLLECTING_REQUIREMENTS`
 
+---
+
+## Centralized Audit Middleware & Data Lineage
+
+Implemented in `packages/backend/convex/system/ai/observability/auditMiddleware.ts`:
+
+- **Universal Traceability**: Every execution path (Chat, Voice, Audio, WebRTC, ElevenLabs, Operator Enhancement) generates a correlated trace ID (`tr_{channel}_{timestamp}_{rand}`) and logs structured lifecycle events (`aiAuditEvents` table).
+- **RAG Data Lineage**: On every knowledge query, records user prompt, effective retrieval strategy (`dense`, `bm25`, `hybrid_rrf`), retrieved chunk IDs, page numbers, cosine/BM25 scores, selected evidence snippets, and the generated response (`ragLineageRecords` table).
+- **Voice Traceability**: Tracks speech input $\rightarrow$ transcription $\rightarrow$ retrieval $\rightarrow$ agent execution $\rightarrow$ markdown cleanup (`formatForSpeech`) $\rightarrow$ ElevenLabs TTS synthesis $\rightarrow$ audio output.
+- **Privacy & Security**: Automated redaction of PII (emails, phone numbers, API keys) before persistence (`maskPIIForLogging`).
+- **Performance**: Validated benchmark overhead of $< 0.02\text{ms}$ per audit event.
+
+---
+
+## Incremental Document Ingestion Pipeline
+
+Implemented in `packages/backend/convex/system/ai/rag/incremental/`:
+
+- **Pure-JS FIPS 180-4 SHA-256**: Zero-dependency hashing compatible with Convex V8 isolates (`pageSplitter.ts`).
+- **Structure-Aware Chunking**: Preserves Markdown tables, code blocks, and section headers intact without mid-row splitting (`structureChunker.ts`).
+- **Selective Re-embedding**: On document updates, computes page hashes; unchanged pages are skipped; modified chunks are generated and re-embedded, minimizing OpenAI embedding calls (`incrementalPipeline.ts`).
+- **Stale Embedding Deletion**: Automatically purges orphaned chunk vectors from `@convex-dev/rag` when pages are deleted or re-chunked.
+

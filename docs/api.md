@@ -257,6 +257,68 @@ Returns `null` if no Vapi plugin configured or credentials incomplete.
 
 ---
 
+### Voice Settings (Widget)
+
+#### `public.voiceSettings.getVoiceConfig` — query
+
+Returns public voice configuration overrides (ElevenLabs voice, model, latency, transcriber language) for widget voice calling.
+
+**Args:**
+```typescript
+{ organizationId: string }
+```
+
+**Returns:** Non-secret voice parameters (`elevenLabsVoiceId`, `elevenLabsModel`, `transcriberLanguage`, `voiceConfigVersion`, etc.) or `null`.
+
+---
+
+### Travel Voice Agent (Widget & Standalone Page)
+
+#### `public.travel.createOrGetSession` — mutation
+Initializes or refreshes a travel booking session with a 24h TTL.
+**Args:** `{ organizationId: string, sessionToken?: string, contactSessionId?: Id<"contactSessions"> }`
+
+#### `public.travel.processSpokenTurn` — mutation
+Extracts travel slots (origin, destination, date, mode), normalizes speech corrections, executes search or prompts for missing requirements.
+**Args:** `{ sessionToken: string, spokenText: string }`
+
+#### `public.travel.confirmBooking` — mutation
+Executes booking confirmation behind an explicit customer confirmation gate.
+**Args:** `{ sessionToken: string, idempotencyKey: string, passengers: PassengerDetails[] }`
+
+#### `public.travel.getAvailableLocations` — query
+Returns the supported location catalog (cities, airport/station codes, states).
+
+---
+
+### Queue (Widget)
+
+#### `public.queue.joinQueue` — mutation
+Enqueues a customer into the real-time FIFO escalation queue.
+**Args:** `{ conversationId: Id<"conversations">, contactSessionId: Id<"contactSessions">, priority?: "normal" | "high" | "urgent" }`
+
+#### `public.queue.getQueueStatus` — query
+Returns current position and estimated wait time in the queue.
+**Args:** `{ queueEntryId: Id<"supportQueue">, contactSessionId: Id<"contactSessions"> }`
+
+#### `public.queue.leaveQueue` — mutation
+Cancels a waiting queue entry.
+**Args:** `{ queueEntryId: Id<"supportQueue">, contactSessionId: Id<"contactSessions"> }`
+
+#### `public.queue.scheduleCallback` — mutation
+Schedules an operator callback window up to 7 days ahead.
+**Args:** `{ conversationId: Id<"conversations">, contactSessionId: Id<"contactSessions">, callbackPhoneNumber: string, scheduledFor: number }`
+
+---
+
+### Audit & Lineage (Widget)
+
+#### `public.audit.getLineageByTraceId` — query
+Returns public RAG source chunk citations and attributions for a verified contact session.
+**Args:** `{ traceId: string, contactSessionId: Id<"contactSessions"> }`
+
+---
+
 ## Private Functions (Dashboard-Facing)
 
 All functions require a valid Clerk JWT with `orgId` claim. All functions are in `convex/private/`.
@@ -579,6 +641,61 @@ Lists Vapi phone numbers for the connected Vapi account.
 **Errors:**
 - `UNAUTHORIZED` — no identity or no orgId
 - `NOT_FOUND` — Vapi plugin not connected or credentials incomplete
+
+---
+
+### Voice Settings (Dashboard)
+
+#### `private.voiceSettings.upsertVoiceSettings` — mutation
+Configures organization-wide voice settings (ElevenLabs voice ID, model, stability, similarity boost, speed, latency optimization, transcriber provider, language).
+**Args:** `{ elevenLabsVoiceId?: string, elevenLabsModel?: string, elevenLabsStability?: number, elevenLabsSimilarityBoost?: number, elevenLabsSpeed?: number, elevenLabsOptimizeStreamingLatency?: number, transcriberProvider?: string, transcriberLanguage?: string, interruptionVoiceSeconds?: number, startSpeakingWaitSeconds?: number, voiceDesignDescription?: string, voiceDesignType?: string }`
+
+#### `private.voiceSettings.getVoiceSettings` — query
+Returns the full voice configuration for the dashboard.
+
+#### `private.voiceSettings.listVoiceLibrary` — action
+Fetches account voice library from Vapi / ElevenLabs API with graceful fallback to curated popular voices.
+
+---
+
+### Evaluations & Quality (Dashboard)
+
+#### `private.evaluations.getMany` — query
+Lists LLM-as-a-Judge evaluation records with filtering by status or conversation ID.
+
+#### `private.evaluations.getSummaryMetrics` — query
+Aggregates quality metrics (average faithfulness, answer relevance, context relevance, completeness, tool use correctness, human review percentage).
+
+#### `private.evaluations.submitHumanReview` — mutation
+Records an operator's human-in-the-loop audit decision and review notes.
+**Args:** `{ evaluationId: Id<"evaluations">, status: "approved" | "flagged", notes?: string }`
+
+---
+
+### Queue & Agent Presence (Dashboard)
+
+#### `private.queue.listQueueEntries` — query
+Lists active customer queue entries sorted by priority and FIFO wait time.
+
+#### `private.queue.setAgentPresence` — mutation
+Updates operator availability status (`available`, `busy`, `offline`, `on_call`) and skills.
+**Args:** `{ status: "available" | "busy" | "offline" | "on_call", skills?: string[] }`
+
+#### `private.queue.completeCall` — mutation
+Marks a live support call as completed, freeing the agent and updating queue status.
+**Args:** `{ callId: Id<"supportCalls">, durationSeconds?: number, transcriptSummary?: string }`
+
+---
+
+### Audit & Lineage (Dashboard)
+
+#### `private.audit.getLineageByConversation` — query
+Fetches end-to-end RAG data lineage records (query, chunk IDs, page numbers, model, evidence items) for a conversation.
+**Args:** `{ conversationId: Id<"conversations"> }`
+
+#### `private.audit.listAuditEvents` — query
+Lists recent AI audit events (latency, stage, modality, status, tokens, errors) with trace filtering.
+**Args:** `{ traceId?: string, channel?: "chat" | "voice" | "operator", limit?: number }`
 
 ---
 

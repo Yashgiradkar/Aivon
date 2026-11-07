@@ -200,19 +200,28 @@ sequenceDiagram
 
 ### Tables (defined in `convex/schema.ts`)
 
-| Table | Key Fields | Indexes |
-|-------|-----------|---------|
-| `subscriptions` | `organizationId`, `status` | `by_organization_id` |
-| `widgetSettings` | `organizationId`, `greetMessage`, `defaultSuggestions`, `vapiSettings` | `by_organization_id` |
-| `plugins` | `organizationId`, `service`, `secretName` | `by_organization_id`, `by_organization_id_and_service` |
-| `conversations` | `threadId`, `organizationId`, `contactSessionId`, `status` | `by_organization_id`, `by_contact_session_id`, `by_thread_id`, `by_status_and_organization_id` |
-| `contactSessions` | `name`, `email`, `organizationId`, `expiresAt`, `metadata` | `by_organization_id`, `by_expires_at` |
-| `supportQueue` | `organizationId`, `conversationId`, `contactSessionId`, `status`, `priority`, `position`, `assignedAgentId`, `aiSummary`, `isCallback` | `by_organization_id`, `by_organization_id_and_status`, `by_contact_session_id`, `by_conversation_id`, `by_assigned_agent` |
-| `supportAgentAvailability` | `organizationId`, `agentId`, `agentName`, `status`, `currentConversationId`, `currentQueueEntryId` | `by_organization_id`, `by_organization_id_and_status`, `by_agent_id` |
-| `supportCalls` | `organizationId`, `queueEntryId`, `conversationId`, `contactSessionId`, `agentId`, `status`, `startedAt`, `durationSeconds` | `by_organization_id`, `by_queue_entry_id`, `by_conversation_id` |
-| `travelSessions` | `sessionToken`, `organizationId`, `state`, `slots`, `expiresAt` | `by_session_token` |
-| `travelBookings` | `travelSessionId`, `bookingReference`, `idempotencyToken`, `status`, `optionId`, `passengers` | `by_session_token`, `by_idempotency_token`, `by_booking_reference` |
-| `users` | `name` | (none — dev/test stub) |
+| Table | Key Fields | Indexes | Purpose |
+|-------|-----------|---------|---------|
+| `subscriptions` | `organizationId`, `status` | `by_organization_id` | Stripe/Clerk subscription status tracking |
+| `widgetSettings` | `organizationId`, `greetMessage`, `defaultSuggestions`, `vapiSettings`, `voiceSettings` | `by_organization_id` | Customer widget customization & ElevenLabs voice overrides |
+| `plugins` | `organizationId`, `service`, `secretName` | `by_organization_id`, `by_organization_id_and_service` | Third-party plugin pointers (Vapi, ElevenLabs) |
+| `conversations` | `threadId`, `organizationId`, `contactSessionId`, `status`, `lastMessageText`, `lastMessageRole`, `lastMessageAt` | `by_organization_id`, `by_contact_session_id`, `by_thread_id`, `by_status_and_organization_id` | Chat conversation session tracking |
+| `contactSessions` | `name`, `email`, `organizationId`, `expiresAt`, `metadata` | `by_organization_id`, `by_organization_id_and_email`, `by_expires_at` | Ephemeral 24h end-user visitor sessions |
+| `supportQueue` | `organizationId`, `conversationId`, `contactSessionId`, `status`, `priority`, `position`, `assignedAgentId`, `aiSummary`, `isCallback` | `by_organization_id`, `by_organization_id_and_status`, `by_contact_session_id`, `by_conversation_id`, `by_assigned_agent` | Real-time human support escalation FIFO queue |
+| `supportAgentAvailability` | `organizationId`, `agentId`, `agentName`, `status`, `currentConversationId`, `currentQueueEntryId`, `skills` | `by_organization_id`, `by_organization_id_and_status`, `by_agent_id`, `by_organization_id_and_agent_id` | Operator online/offline/busy presence tracking |
+| `supportCalls` | `organizationId`, `queueEntryId`, `conversationId`, `contactSessionId`, `agentId`, `vapiCallId`, `status`, `startedAt`, `durationSeconds` | `by_organization_id`, `by_queue_entry_id`, `by_conversation_id` | WebRTC / Vapi voice bridge call lifecycle |
+| `evaluations` | `organizationId`, `conversationId`, `threadId`, `traceId`, `scores`, `judgeModel`, `rubricVersion`, `humanReviewStatus` | `by_organization_id`, `by_conversation_id`, `by_organization_id_and_status` | LLM-as-a-Judge quality & compliance scores |
+| `customerMemories` | `organizationId`, `customerIdentifier`, `memoryType`, `key`, `content`, `confidence`, `status` | `by_organization_id`, `by_org_and_customer`, `by_org_and_type`, `by_expires_at` | Long-term episodic/semantic customer memory store |
+| `semanticAnswerCache` | `organizationId`, `canonicalQuery`, `queryHash`, `response`, `evidenceIds`, `knowledgeVersion`, `expiresAt` | `by_organization_id`, `by_org_and_query_hash`, `by_org_and_expires` | Semantic retrieval & response cache (24h TTL) |
+| `backgroundJobs` | `organizationId`, `jobType`, `status`, `priority`, `payload`, `idempotencyKey`, `attempts` | `by_organization_id`, `by_org_and_status`, `by_idempotency_key`, `by_status_and_scheduled` | Resilient async background task scheduling queue |
+| `tenantRateLimits` | `organizationId`, `tier`, `tokensUsedThisMonth`, `monthlyTokenQuota`, `requestsThisMinute`, `concurrentOperationsActive` | `by_organization_id` | Tiered token quota and concurrency accounting |
+| `keyedRateLimits` | `key`, `windowStart`, `count` | `by_key` | Distributed sliding-window rate limit counters |
+| `orchestrationExecutions` | `organizationId`, `conversationId`, `threadId`, `idempotencyKey`, `channel`, `status`, `routingCategory`, `executionPlan` | `by_organization_id`, `by_conversation_id`, `by_idempotency_key`, `by_org_and_status` | Multi-agent execution persistence & trace records |
+| `travelSessions` | `sessionToken`, `organizationId`, `status`, `extractedSlots`, `searchResults`, `selectedOption`, `confirmationRequired` | `by_organization_id`, `by_session_token`, `by_idempotency_token` | Voice travel booking workflow state machine |
+| `travelBookings` | `organizationId`, `travelSessionId`, `bookingReference`, `transportMode`, `fare`, `status`, `idempotencyKey` | `by_organization_id`, `by_booking_reference`, `by_idempotency_key` | Confirmed travel tickets & booking records |
+| `aiAuditEvents` | `organizationId`, `traceId`, `conversationId`, `channel`, `eventType`, `stage`, `status`, `latencyMs`, `timestamp` | `by_organization_id`, `by_conversation_id`, `by_trace_id`, `by_org_and_timestamp` | Centralized audit log capturing AI execution stages |
+| `ragLineageRecords` | `organizationId`, `traceId`, `conversationId`, `channel`, `userQuery`, `retrievedEvidence`, `generatedResponse`, `model` | `by_organization_id`, `by_conversation_id`, `by_trace_id`, `by_org_and_timestamp` | Full RAG data lineage & source chunk attribution |
+| `users` | `name` | (none) | Legacy dev stub for Sentry testing |
 
 **Agent/RAG tables** are managed by `@convex-dev/agent` and `@convex-dev/rag` components — they exist in the Convex instance but are not in `schema.ts`.
 

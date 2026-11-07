@@ -157,3 +157,59 @@
 - ❌ Quality depends on OpenAI model capabilities; may miss complex formatting
 
 **Consequences:** PDF extraction uses `gpt-4o` (more capable than `gpt-4o-mini`) due to document complexity. This is encoded in the `AI_MODELS` object in `extractTextContent.ts`.
+
+---
+
+## ADR-009: Hybrid RAG with Reciprocal Rank Fusion (RRF) & Incremental Document Ingestion
+
+**Status:** Confirmed  
+**Evidence:** `convex/system/ai/rag/unifiedSearch.ts`, `bm25.ts`, `fusion.ts`, `incremental/pageSplitter.ts`, `structureChunker.ts`, `chunkEmbeddingCache.ts`.
+
+**Decision:** Combine dense semantic vector embeddings (`@convex-dev/rag`, dimension 1536) with sparse BM25 keyword matching via Reciprocal Rank Fusion ($k=60$), combined with a content-addressed SHA-256 incremental update pipeline.
+
+**Context:** Pure dense vector search frequently fails on exact alphanumeric part numbers, policy codes, pricing figures, and table structures. Furthermore, re-embedding entire 100-page PDF documents for a single-page edit incurs unacceptable OpenAI embedding API costs and latency.
+
+**Trade-offs:**
+- ✅ Superior retrieval precision for both conceptual semantic queries and exact keyword/policy identifiers
+- ✅ Zero redundant embeddings: only modified pages and chunks are processed and embedded
+- ✅ Stable document, page, and chunk IDs for precise source attribution
+- ❌ Requires in-memory tenant BM25 index caching and index lifecycle management
+
+**Consequences:** Unified search automatically routes queries to hybrid retrieval, structured table parsers, or direct semantic lookup, returning rich citations to the frontend.
+
+---
+
+## ADR-010: Centralized AI Audit Middleware & End-to-End Data Lineage
+
+**Status:** Confirmed  
+**Evidence:** `convex/system/ai/observability/auditMiddleware.ts`, `schema.ts:aiAuditEvents`, `schema.ts:ragLineageRecords`, `private/audit.ts`, `public/audit.ts`.
+
+**Decision:** Enforce centralized observability across text, voice, WebRTC, ElevenLabs, and LLM provider workflows using a unified middleware interceptor that automatically records correlated trace IDs and RAG data lineage.
+
+**Context:** Debugging multi-agent decisions, customer escalations, hallucination claims, and compliance questions required full auditability from the initial user prompt down to chunk IDs, page numbers, retrieval scores, latency, and tokens.
+
+**Trade-offs:**
+- ✅ Complete visibility into multi-modal agent execution and RAG source attribution
+- ✅ Built-in PII and secret masking prior to logging
+- ✅ Minimal overhead (< 0.02ms per event) via batching and non-blocking persistence
+- ❌ Additional database storage for audit events and lineage records
+
+**Consequences:** Both the operator dashboard and customer widget can inspect exact source documents, page numbers, and chunk citations for any AI-generated response.
+
+---
+
+## ADR-011: Pure JS SHA-256 for Convex V8 Isolated Runtime Compatibility
+
+**Status:** Confirmed  
+**Evidence:** `convex/system/ai/rag/incremental/pageSplitter.ts`.
+
+**Decision:** Implement a zero-dependency pure JavaScript FIPS 180-4 SHA-256 digest function rather than importing `node:crypto`.
+
+**Context:** Convex mutations and queries execute in a specialized, deterministic V8 isolated runtime that does not provide Node.js standard library modules (`node:crypto`, `node:fs`). Attempting to bundle Node APIs in non-action files breaks deployment.
+
+**Trade-offs:**
+- ✅ Runs seamlessly across Convex V8 isolate, Edge runtime, and Node.js without bundling errors
+- ✅ Preserves standard 64-character hex digests for page and chunk change detection
+- ❌ Pure JS implementation is slightly slower than C++ native crypto, but negligible for in-memory page text hashing (< 0.1ms).
+
+**Consequences:** All incremental page hashing operates in standard Convex mutations without requiring external Node actions.

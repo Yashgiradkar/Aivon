@@ -144,6 +144,15 @@ User at /travel (no auth required)
 | `supportCalls` | Vapi voice call records | `by_conversation_id` |
 | `travelSessions` | Voice travel agent session state | `by_session_token` |
 | `travelBookings` | Confirmed travel bookings with idempotency | `by_idempotency_token`, `by_booking_reference` |
+| `evaluations` | LLM-as-a-Judge evaluation records and human reviews | `by_organization_id`, `by_conversation_id`, `by_organization_id_and_status` |
+| `customerMemories` | Long-term customer memory (semantic, episodic, entity) | `by_organization_id`, `by_org_and_customer`, `by_expires_at` |
+| `semanticAnswerCache` | Semantic search and response caching | `by_organization_id`, `by_org_and_query_hash`, `by_org_and_expires` |
+| `backgroundJobs` | Resilient async background job queue | `by_organization_id`, `by_org_and_status`, `by_idempotency_key` |
+| `tenantRateLimits` | Distributed tiered rate limits and token accounting | `by_organization_id` |
+| `keyedRateLimits` | Distributed sliding-window rate limit counters | `by_key` |
+| `orchestrationExecutions` | Multi-agent execution tracking and plans | `by_organization_id`, `by_conversation_id`, `by_idempotency_key` |
+| `aiAuditEvents` | Centralized audit trail across all AI channels | `by_organization_id`, `by_conversation_id`, `by_trace_id`, `by_org_and_timestamp` |
+| `ragLineageRecords` | RAG data lineage, chunk IDs, page numbers, citations | `by_organization_id`, `by_conversation_id`, `by_trace_id`, `by_org_and_timestamp` |
 
 ---
 
@@ -151,15 +160,16 @@ User at /travel (no auth required)
 
 | Domain | Status | Key Characteristics |
 |---|---|---|
-| **Security** | ✅ Implemented | `InputSanitizer` (PII redaction, injection detection), `RateLimiter` (sliding-window), `OutputGuardrails` (schema validation) |
-| **Reliability** | ✅ Implemented | Model registry, exponential backoff + jitter, timeouts, `CircuitBreaker` (CLOSED/OPEN/HALF_OPEN) |
-| **LLM & Tokens** | ✅ Implemented | Centralized model config, strict `maxTokens` budgets, sliding context window |
-| **RAG Pipeline** | ✅ Implemented | Hybrid BM25 + dense + RRF, deterministic query routing, degraded-mode fallback, tenant isolation |
+| **Security & OWASP** | ✅ Implemented | PII masking (`[REDACTED_EMAIL]`, `[REDACTED_PHONE]`, `[REDACTED_API_KEY]`), 21+ indirect injection heuristics, pure-JS SHA-256 in isolates, CSP without unsafe-eval, HSTS preload, COOP, CORP |
+| **Audit & Observability** | ✅ Implemented | Centralized `AuditMiddleware`, correlated `traceId` across chat/voice/operator, RAG data lineage down to chunk ID/page, sub-0.02ms logging overhead |
+| **Reliability** | ✅ Implemented | Model registry, exponential backoff + jitter, timeouts, `CircuitBreaker` (CLOSED/OPEN/HALF_OPEN), ACID mutations |
+| **LLM & Tokens** | ✅ Implemented | Tiered limits (Free: 100k, Pro: 2.5M, Enterprise: 25M), atomic `checkAndAdmit`, post-call usage reconciliation |
+| **RAG Pipeline** | ✅ Implemented | Hybrid BM25 + dense + RRF, incremental document ingestion, pure-JS SHA-256 change detection, selective re-embedding |
 | **Agents & Tools** | ✅ Implemented | `supportAgent` + `TravelAgentCapability`; orchestration router + planner; structured tool schemas |
-| **Voice Travel Agent** | ✅ Implemented | Multi-turn state machine, slot normalizer, consequential action gates, idempotency, 100% test pass |
+| **Voice & ElevenLabs** | ✅ Implemented | Web Speech API travel agent, Vapi WebRTC bridge, ElevenLabs TTS with latency optimization and markdown speech formatting |
 | **HITL** | ✅ Implemented | FIFO+priority queue, atomic agent matcher, AI handoff summaries, Vapi WebRTC bridge |
 | **Evaluation** | ✅ Implemented | LLM-as-a-Judge (v2026.1 rubric), human review workflow, per-org analytics dashboard |
-| **Observability** | ✅ Implemented | Sentry integration (web), Convex function logs, structured error codes |
-| **Testing** | ✅ Implemented | `travelNormalizer.test.ts` (7 suites), `travelWorkflow.test.ts` (4 suites), security guardrail tests |
-| **Cost Controls** | ✅ Implemented | BM25 as zero-API-cost fallback, subscription gates, rate limiting per session |
+| **Observability** | ✅ Implemented | Sentry integration (web), Convex function logs, structured error codes, `aiAuditEvents` table |
+| **Testing** | ✅ Implemented | 23 comprehensive standalone test suites (`pnpm test`) covering security, limits, RAG, voice, and travel workflows |
+| **Cost Controls** | ✅ Implemented | BM25 as zero-API-cost fallback, subscription gates, rate limiting per session, chunk cache |
 | **Performance** | ✅ Optimized | Zero N+1 queries, streaming responses, suspense boundaries, layout-level prefetching |
