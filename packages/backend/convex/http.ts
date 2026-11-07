@@ -36,11 +36,14 @@ http.route({
     }
 
     switch (event.type) {
-      case "subscription.updated": {
+      case "subscription.created":
+      case "subscription.updated":
+      case "subscription.active":
+      case "subscription.pastDue": {
         const subscription = event.data as {
           status: string;
           payer?: {
-            organization_id: string;
+            organization_id?: string;
           };
         };
 

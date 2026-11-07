@@ -277,6 +277,7 @@ export const generateSummary = internalAction({
       });
 
       const transcript = (messagesData.page || [])
+        .filter((m) => !m.tool && m.message?.role !== "tool" && m.message?.role !== "system")
         .map((m) => {
           const role = m.message?.role === "user" ? "Customer" : "Assistant";
           const text =
@@ -286,6 +287,7 @@ export const generateSummary = internalAction({
               : JSON.stringify(m.message?.content ?? ""));
           return `${role}: ${text}`;
         })
+        .filter((line) => line.trim().length > 0)
         .join("\n")
         .slice(0, MAX_TRANSCRIPT_SUMMARY_CHARS);
       const { sanitized: untrustedTranscript } =

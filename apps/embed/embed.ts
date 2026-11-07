@@ -15,7 +15,8 @@ import { chatBubbleIcon, closeIcon } from './icons';
   const currentScript = document.currentScript as HTMLScriptElement;
   if (currentScript) {
     organizationId = currentScript.getAttribute('data-organization-id');
-    position = (currentScript.getAttribute('data-position') as 'bottom-right' | 'bottom-left') || EMBED_CONFIG.DEFAULT_POSITION;
+    const rawPos = currentScript.getAttribute('data-position');
+    position = rawPos === 'bottom-left' ? 'bottom-left' : 'bottom-right';
   } else {
     // Fallback: find script tag by src
     const scripts = document.querySelectorAll('script[src*="embed"]');
@@ -25,7 +26,8 @@ import { chatBubbleIcon, closeIcon } from './icons';
     
     if (embedScript) {
       organizationId = embedScript.getAttribute('data-organization-id');
-      position = (embedScript.getAttribute('data-position') as 'bottom-right' | 'bottom-left') || EMBED_CONFIG.DEFAULT_POSITION;
+      const rawPos = embedScript.getAttribute('data-position');
+      position = rawPos === 'bottom-left' ? 'bottom-left' : 'bottom-right';
     }
   }
   
@@ -123,17 +125,30 @@ import { chatBubbleIcon, closeIcon } from './icons';
   }
   
   function handleMessage(event: MessageEvent) {
-    if (event.origin !== new URL(EMBED_CONFIG.WIDGET_URL).origin) return;
+    if (!event || !event.data || typeof event.data !== 'object') return;
+    try {
+      if (event.origin !== new URL(EMBED_CONFIG.WIDGET_URL).origin) return;
+    } catch {
+      return;
+    }
     
-    const { type, payload } = event.data;
+    const { type, payload } = event.data as { type?: unknown; payload?: unknown };
     
     switch (type) {
       case 'close':
         hide();
         break;
       case 'resize':
-        if (payload.height && container) {
-          container.style.height = `${payload.height}px`;
+        if (
+          payload &&
+          typeof payload === 'object' &&
+          'height' in payload &&
+          typeof (payload as { height?: unknown }).height === 'number' &&
+          container
+        ) {
+          const height = (payload as { height: number }).height;
+          const boundedHeight = Math.min(Math.max(height, 200), 1200);
+          container.style.height = `${boundedHeight}px`;
         }
         break;
     }
@@ -209,13 +224,24 @@ import { chatBubbleIcon, closeIcon } from './icons';
     init();
   }
   
-  // Expose API to global scope
-  (window as any).EchoWidget = {
+  // Expose API to global scope with tamper protection
+  const api = Object.freeze({
     init: reinit,
     show,
     hide,
-    destroy
-  };
+    destroy,
+  });
+
+  try {
+    Object.defineProperty(window, 'EchoWidget', {
+      value: api,
+      writable: false,
+      configurable: false,
+      enumerable: true,
+    });
+  } catch {
+    (window as any).EchoWidget = api;
+  }
   
   // Auto-initialize
   init();

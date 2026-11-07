@@ -258,11 +258,11 @@ export const completeQueueEntry = mutation({
       completedAt: Date.now(),
     });
 
-    const agentId = identity.subject;
+    const targetAgentId = queueEntry.assignedAgentId || identity.subject;
     const agentRecord = await ctx.db
       .query("supportAgentAvailability")
       .withIndex("by_organization_id_and_agent_id", (q) =>
-        q.eq("organizationId", orgId).eq("agentId", agentId),
+        q.eq("organizationId", orgId).eq("agentId", targetAgentId),
       )
       .unique();
 
@@ -273,12 +273,33 @@ export const completeQueueEntry = mutation({
         currentQueueEntryId: undefined,
         lastActiveAt: Date.now(),
       });
-
-      // Match next customer
-      await ctx.scheduler.runAfter(0, internal.system.queue.matchAndAssign, {
-        organizationId: orgId,
-      });
     }
+
+    // Also free up completing operator if they were distinct and marked on_call for this queue entry
+    if (identity.subject !== targetAgentId) {
+      const operatorRecord = await ctx.db
+        .query("supportAgentAvailability")
+        .withIndex("by_organization_id_and_agent_id", (q) =>
+          q.eq("organizationId", orgId).eq("agentId", identity.subject),
+        )
+        .unique();
+      if (
+        operatorRecord &&
+        operatorRecord.currentQueueEntryId === args.queueEntryId
+      ) {
+        await ctx.db.patch(operatorRecord._id, {
+          status: "available",
+          currentConversationId: undefined,
+          currentQueueEntryId: undefined,
+          lastActiveAt: Date.now(),
+        });
+      }
+    }
+
+    // Match next customer
+    await ctx.scheduler.runAfter(0, internal.system.queue.matchAndAssign, {
+      organizationId: orgId,
+    });
   },
 });
 
@@ -299,6 +320,14 @@ export const getCallLogs = query({
     }
 
     const orgId = identity.orgId as string;
+
+    const conversation = await ctx.db.get(args.conversationId);
+    if (!conversation || conversation.organizationId !== orgId) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Conversation not found",
+      });
+    }
 
     const calls = await ctx.db
       .query("supportCalls")

@@ -32,15 +32,19 @@ export const MAX_AI_SUMMARY_LENGTH = 2000;
 export const MAX_TRANSCRIPT_SUMMARY_CHARS = 12_000;
 
 const ALLOWED_SUBSCRIPTION_STATUSES = new Set([
+  "abandoned",
   "active",
   "canceled",
   "cancelled",
+  "ended",
+  "expired",
   "incomplete",
   "incomplete_expired",
   "past_due",
   "paused",
   "trialing",
   "unpaid",
+  "upcoming",
 ]);
 
 export function rejectBadRequest(message: string): never {
