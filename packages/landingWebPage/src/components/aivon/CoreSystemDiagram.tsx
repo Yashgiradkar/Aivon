@@ -9,15 +9,21 @@ export const CoreSystemDiagram: React.FC = () => {
     <div className="w-full space-y-8">
       {/* Section Header */}
       <div className="space-y-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-gold/10 border border-gold/30">
-          <span className="text-gold font-mono text-[11px] font-bold uppercase tracking-wider">
+        <div
+          className="inline-flex items-center gap-2 px-3 py-1 rounded-md"
+          style={{ background: "rgba(79,140,255,0.08)", border: "1px solid var(--accent-border)" }}
+        >
+          <span
+            className="font-mono text-[11px] font-bold uppercase tracking-wider"
+            style={{ color: "var(--accent-soft)" }}
+          >
             Living Architecture Flow
           </span>
         </div>
 
         <h3 className="text-white font-black text-2xl sm:text-3xl lg:text-4xl leading-tight">
           How Aivon works:{" "}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold via-gold-light to-white">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F8CFF] via-[#7FB2FF] to-white">
             from client input to system action.
           </span>
         </h3>
@@ -29,12 +35,17 @@ export const CoreSystemDiagram: React.FC = () => {
       </div>
 
       {/* Interactive Main Pipeline Flow */}
-      <div className="p-6 rounded-2xl bg-black-100/90 border border-white/[0.08] space-y-6">
+      <div
+        className="p-6 rounded-2xl space-y-6 card-toplight"
+        style={{ background: "var(--surface-card)", border: "1px solid var(--border-neutral)" }}
+      >
         <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
           <span className="text-xs font-mono font-bold text-secondary uppercase tracking-widest">
             Primary Execution Loop (Click any node)
           </span>
-          <span className="text-[11px] font-mono text-gold">Sub-250ms Target E2E</span>
+          <span className="text-[11px] font-mono" style={{ color: "var(--accent-primary)" }}>
+            Sub-250ms Target E2E
+          </span>
         </div>
 
         {/* Horizontal Pipeline Steps */}
@@ -45,22 +56,46 @@ export const CoreSystemDiagram: React.FC = () => {
               <button
                 key={node.id}
                 onClick={() => setSelectedNodeId(node.id)}
-                className={`p-3.5 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between h-[130px] relative group ${
+                className="p-3.5 rounded-xl text-left transition-all cursor-pointer flex flex-col justify-between h-[130px] relative group card-toplight"
+                style={
                   isSelected
-                    ? "bg-tertiary border-gold shadow-[0_0_20px_rgba(214,168,75,0.22)] scale-[1.02]"
-                    : "bg-black-200/80 border-white/[0.06] hover:border-gold/40 hover:bg-tertiary/50"
-                }`}
+                    ? {
+                        background: "var(--surface-card-alt)",
+                        border: "1px solid var(--accent-border)",
+                        boxShadow: "0 0 20px rgba(79,140,255,0.15)",
+                        transform: "scale(1.02)",
+                      }
+                    : {
+                        background: "var(--surface-card)",
+                        border: "1px solid var(--border-neutral)",
+                      }
+                }
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent-border)";
+                    (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-card-alt)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-neutral)";
+                    (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-card)";
+                  }
+                }}
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono text-gold font-bold">
+                    <span
+                      className="text-[10px] font-mono font-bold"
+                      style={{ color: "var(--accent-soft)" }}
+                    >
                       0{idx + 1}
                     </span>
                     <span className="text-[9px] font-mono text-secondary px-1 py-0.5 rounded bg-white/5">
                       {node.category}
                     </span>
                   </div>
-                  <p className="mt-2 text-xs font-bold text-white group-hover:text-[#f2dfbd] transition-colors leading-snug">
+                  <p className="mt-2 text-xs font-bold text-white leading-snug">
                     {node.title}
                   </p>
                 </div>
@@ -76,10 +111,19 @@ export const CoreSystemDiagram: React.FC = () => {
         </div>
 
         {/* Selected Node Technical Breakdown Drawer */}
-        <div className="p-5 sm:p-6 rounded-xl bg-gradient-to-r from-tertiary via-black-200 to-tertiary border border-gold/40 transition-all duration-300">
+        <div
+          className="p-5 sm:p-6 rounded-xl transition-all duration-300 card-toplight"
+          style={{
+            background: "linear-gradient(to right, var(--surface-card-alt), var(--surface-card), var(--surface-card-alt))",
+            border: "1px solid var(--accent-border)",
+          }}
+        >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/[0.08]">
             <div>
-              <span className="text-[10px] font-mono text-gold uppercase tracking-widest font-bold">
+              <span
+                className="text-[10px] font-mono uppercase tracking-widest font-bold"
+                style={{ color: "var(--accent-soft)" }}
+              >
                 {selectedNode.category} • Technical Inspection
               </span>
               <h4 className="text-lg font-bold text-white mt-0.5">
@@ -87,7 +131,14 @@ export const CoreSystemDiagram: React.FC = () => {
                 <span className="text-secondary text-sm font-normal">— {selectedNode.subtitle}</span>
               </h4>
             </div>
-            <span className="px-2.5 py-1 text-xs font-mono rounded bg-gold/15 text-gold border border-gold/40 self-start sm:self-auto">
+            <span
+              className="px-2.5 py-1 text-xs font-mono rounded self-start sm:self-auto"
+              style={{
+                background: "rgba(79,140,255,0.12)",
+                color: "var(--accent-soft)",
+                border: "1px solid var(--accent-border)",
+              }}
+            >
               {selectedNode.tech}
             </span>
           </div>
@@ -99,8 +150,18 @@ export const CoreSystemDiagram: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              <p className="text-xs font-mono text-gold uppercase font-semibold">Implementation Detail</p>
-              <p className="text-[#f2dfbd] text-xs sm:text-[13px] leading-relaxed font-mono">{selectedNode.details}</p>
+              <p
+                className="text-xs font-mono uppercase font-semibold"
+                style={{ color: "var(--accent-primary)" }}
+              >
+                Implementation Detail
+              </p>
+              <p
+                className="text-xs sm:text-[13px] leading-relaxed font-mono"
+                style={{ color: "var(--accent-soft)" }}
+              >
+                {selectedNode.details}
+              </p>
             </div>
           </div>
         </div>
@@ -108,8 +169,11 @@ export const CoreSystemDiagram: React.FC = () => {
         {/* Behind the System: Foundation & Security Rails */}
         <div className="pt-4 border-t border-white/[0.06] space-y-4">
           <div className="flex items-center gap-2">
-            <span className="text-gold text-xs font-mono font-bold uppercase tracking-wider">
-              Underlying System Rails & Production Guards
+            <span
+              className="text-xs font-mono font-bold uppercase tracking-wider"
+              style={{ color: "var(--accent-primary)" }}
+            >
+              Underlying System Rails &amp; Production Guards
             </span>
             <div className="flex-1 h-[1px] bg-white/[0.08]" />
           </div>
@@ -118,11 +182,28 @@ export const CoreSystemDiagram: React.FC = () => {
             {infrastructureRails.map((rail) => (
               <div
                 key={rail.title}
-                className="p-3.5 rounded-xl bg-black-200/60 border border-white/[0.05] hover:border-gold/30 transition-colors space-y-1.5"
+                className="p-3.5 rounded-xl space-y-1.5 transition-colors card-toplight"
+                style={{
+                  background: "var(--surface-card-alt)",
+                  border: "1px solid var(--border-neutral)",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLDivElement).style.borderColor = "var(--accent-border)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-neutral)";
+                }}
               >
                 <div className="flex items-center justify-between">
                   <p className="text-white text-xs font-bold">{rail.title}</p>
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-gold/10 text-gold border border-gold/25">
+                  <span
+                    className="text-[9px] font-mono px-1.5 py-0.5 rounded"
+                    style={{
+                      background: "rgba(79,140,255,0.08)",
+                      color: "var(--accent-soft)",
+                      border: "1px solid var(--accent-border)",
+                    }}
+                  >
                     {rail.badge}
                   </span>
                 </div>
@@ -135,4 +216,3 @@ export const CoreSystemDiagram: React.FC = () => {
     </div>
   );
 };
-

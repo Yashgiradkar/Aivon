@@ -36,13 +36,26 @@ export const SimulatedEnvironment: React.FC = () => {
   };
 
   return (
-    <div className="w-full rounded-2xl bg-gradient-to-b from-[#13110e]/95 via-tertiary/90 to-[#0c0a08]/95 border border-gold/30 p-4 sm:p-7 shadow-[0_20px_60px_-15px_rgba(214,168,75,0.12)]">
+    <div
+      className="w-full rounded-2xl p-4 sm:p-7 card-toplight"
+      style={{
+        background: "linear-gradient(to bottom, var(--surface-card), var(--surface-card-alt))",
+        border: "1px solid var(--accent-border)",
+        boxShadow: "0 20px 60px -15px rgba(79,140,255,0.08)",
+      }}
+    >
       {/* Top Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-white/[0.08]">
         <div className="flex items-center gap-2.5">
           <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gold opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-gold"></span>
+            <span
+              className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+              style={{ background: "var(--accent-primary)" }}
+            />
+            <span
+              className="relative inline-flex rounded-full h-3 w-3"
+              style={{ background: "var(--accent-primary)" }}
+            />
           </span>
           <span className="text-white font-mono text-xs font-bold uppercase tracking-wider">
             Interactive Runtime Simulation
@@ -53,20 +66,29 @@ export const SimulatedEnvironment: React.FC = () => {
         </div>
 
         {/* Scenario Selector Pills */}
-        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-black-200/90 rounded-xl border border-white/[0.08]">
+        <div
+          className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl"
+          style={{ background: "var(--surface-card)", border: "1px solid var(--border-neutral)" }}
+        >
           {simulationScenarios.map((sc, idx) => {
             const isSelected = idx === selectedScenarioIndex;
             return (
               <button
                 key={sc.id}
                 onClick={() => setSelectedScenarioIndex(idx)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer`}
+                style={
                   isSelected
-                    ? "bg-gradient-to-r from-gold to-[#b9792e] text-[#17130e] font-semibold shadow-md"
-                    : "text-secondary hover:text-white hover:bg-white/[0.04]"
-                }`}
+                    ? {
+                        background: "linear-gradient(135deg, #4F8CFF, #2563EB)",
+                        color: "#fff",
+                        fontWeight: 600,
+                        boxShadow: "0 2px 8px rgba(79,140,255,0.25)",
+                      }
+                    : {}
+                }
               >
-                {sc.label}
+                {isSelected ? sc.label : <span className="text-secondary hover:text-white transition-colors">{sc.label}</span>}
               </button>
             );
           })}
@@ -76,15 +98,26 @@ export const SimulatedEnvironment: React.FC = () => {
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
         {/* LEFT: Chat Simulation */}
-        <div className="lg:col-span-5 flex flex-col bg-black-100/90 rounded-xl border border-white/[0.08] p-4 sm:p-5">
+        <div
+          className="lg:col-span-5 flex flex-col rounded-xl p-4 sm:p-5 card-toplight"
+          style={{ background: "var(--surface-card)", border: "1px solid var(--border-neutral)" }}
+        >
           {/* Chat Header */}
           <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.06]">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-gold/20 border border-gold/40 flex items-center justify-center text-gold text-xs font-bold">A</div>
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold"
+                style={{
+                  background: "linear-gradient(135deg, #4F8CFF, #2563EB)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.15)",
+                }}
+              >
+                A
+              </div>
               <div>
                 <p className="text-white text-xs font-semibold">Aivon Chat Widget</p>
                 <p className="text-[10px] font-mono text-secondary">
-                  Tenant: <span className="text-[#f2dfbd]">{scenario.stats.tenant}</span>
+                  Tenant: <span style={{ color: "var(--accent-soft)" }}>{scenario.stats.tenant}</span>
                 </p>
               </div>
             </div>
@@ -107,23 +140,42 @@ export const SimulatedEnvironment: React.FC = () => {
             {/* Customer */}
             <div className="flex flex-col items-end">
               <span className="text-[10px] font-mono text-secondary mb-1">Customer • Just now</span>
-              <div className="bg-gradient-to-r from-gold/20 to-[#b9792e]/20 border border-gold/40 text-white rounded-2xl rounded-tr-sm px-3.5 py-2.5 max-w-[90%] leading-relaxed">
+              <div
+                className="text-white rounded-2xl rounded-tr-sm px-3.5 py-2.5 max-w-[90%] leading-relaxed"
+                style={{
+                  background: "rgba(79,140,255,0.12)",
+                  border: "1px solid var(--accent-border)",
+                }}
+              >
                 {scenario.customerQuery}
               </div>
             </div>
 
             {/* AI Response */}
             <div className="flex flex-col items-start">
-              <span className="text-[10px] font-mono text-gold mb-1 flex items-center gap-1">
+              <span
+                className="text-[10px] font-mono mb-1 flex items-center gap-1"
+                style={{ color: "var(--accent-primary)" }}
+              >
                 Aivon AI Agent
                 {isSimulating && (
                   <span className="text-secondary italic">({scenario.pipeline[activeStage]?.stage}...)</span>
                 )}
               </span>
-              <div className="bg-tertiary/90 border border-white/10 text-[#f2dfbd] rounded-2xl rounded-tl-sm px-3.5 py-3 max-w-[95%] leading-relaxed shadow-sm transition-all duration-300">
+              <div
+                className="rounded-2xl rounded-tl-sm px-3.5 py-3 max-w-[95%] leading-relaxed shadow-sm transition-all duration-300 card-toplight"
+                style={{
+                  background: "var(--surface-card-alt)",
+                  border: "1px solid var(--border-neutral)",
+                  color: "var(--accent-soft)",
+                }}
+              >
                 {activeStage < 3 ? (
                   <div className="flex items-center gap-2 text-secondary py-1">
-                    <span className="w-2 h-2 rounded-full bg-gold animate-bounce" />
+                    <span
+                      className="w-2 h-2 rounded-full animate-bounce"
+                      style={{ background: "var(--accent-primary)" }}
+                    />
                     <span className="font-mono text-[11px]">
                       {scenario.pipeline[activeStage]?.stage}: {scenario.pipeline[activeStage]?.title}...
                     </span>
@@ -150,13 +202,28 @@ export const SimulatedEnvironment: React.FC = () => {
         {/* RIGHT: Pipeline + Audit Trail */}
         <div className="lg:col-span-7 flex flex-col gap-4">
           {/* Pipeline */}
-          <div className="flex-1 bg-black-200/80 rounded-xl border border-white/[0.08] p-4 sm:p-5">
+          <div
+            className="flex-1 rounded-xl p-4 sm:p-5 card-toplight"
+            style={{ background: "var(--surface-card)", border: "1px solid var(--border-neutral)" }}
+          >
             <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.06]">
               <div>
-                <p className="text-xs font-mono font-bold text-gold uppercase tracking-wider">System Pipeline</p>
+                <p
+                  className="text-xs font-mono font-bold uppercase tracking-wider"
+                  style={{ color: "var(--accent-primary)" }}
+                >
+                  System Pipeline
+                </p>
                 <p className="text-secondary text-[11px]">{scenario.category}</p>
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gold/10 text-gold border border-gold/30">
+              <span
+                className="text-[10px] font-mono px-2 py-0.5 rounded"
+                style={{
+                  background: "rgba(79,140,255,0.10)",
+                  color: "var(--accent-soft)",
+                  border: "1px solid var(--accent-border)",
+                }}
+              >
                 Stage {Math.min(activeStage + 1, scenario.pipeline.length)} / {scenario.pipeline.length}
               </span>
             </div>
@@ -168,30 +235,59 @@ export const SimulatedEnvironment: React.FC = () => {
                 return (
                   <div
                     key={step.stage}
-                    className={`p-3 rounded-lg border transition-all duration-300 ${
+                    className="p-3 rounded-lg border transition-all duration-300"
+                    style={
                       isActive
-                        ? "bg-tertiary border-gold shadow-[0_0_15px_rgba(214,168,75,0.18)] scale-[1.01]"
+                        ? {
+                            background: "var(--surface-card-alt)",
+                            border: "1px solid var(--accent-border)",
+                            boxShadow: "0 0 15px rgba(79,140,255,0.12)",
+                            transform: "scale(1.01)",
+                          }
                         : isPassed
-                        ? "bg-tertiary/50 border-white/10 opacity-80"
-                        : "bg-black-100/40 border-white/[0.04] opacity-35"
-                    }`}
+                        ? { background: "rgba(8,12,20,0.5)", border: "1px solid var(--border-neutral)", opacity: 0.8 }
+                        : { background: "rgba(6,10,17,0.4)", border: "1px solid rgba(255,255,255,0.03)", opacity: 0.35 }
+                    }
                   >
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-2.5">
-                        <span className={`w-5 h-5 rounded-md flex items-center justify-center font-mono text-[10px] font-bold ${
-                          isActive ? "bg-gold text-[#17130e]" : isPassed ? "bg-white/20 text-white" : "bg-white/5 text-secondary"
-                        }`}>
+                        <span
+                          className="w-5 h-5 rounded-md flex items-center justify-center font-mono text-[10px] font-bold"
+                          style={
+                            isActive
+                              ? { background: "var(--accent-primary)", color: "#fff" }
+                              : isPassed
+                              ? { background: "rgba(255,255,255,0.2)", color: "#fff" }
+                              : { background: "rgba(255,255,255,0.05)", color: "#8fa3b8" }
+                          }
+                        >
                           {isPassed ? "✓" : idx + 1}
                         </span>
-                        <span className={`font-mono text-xs font-bold tracking-wider ${isActive ? "text-gold" : "text-white"}`}>{step.stage}</span>
+                        <span
+                          className="font-mono text-xs font-bold tracking-wider"
+                          style={{ color: isActive ? "var(--accent-primary)" : "#fff" }}
+                        >
+                          {step.stage}
+                        </span>
                         <span className="text-white/60 text-xs">—</span>
                         <span className="text-white text-xs font-medium">{step.title}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-mono text-secondary">{step.timing}</span>
-                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                          isActive ? "bg-gold/20 text-gold-light border border-gold/40" : "bg-white/5 text-secondary"
-                        }`}>{step.status}</span>
+                        <span
+                          className="text-[10px] font-mono px-1.5 py-0.5 rounded"
+                          style={
+                            isActive
+                              ? {
+                                  background: "rgba(79,140,255,0.15)",
+                                  color: "var(--accent-soft)",
+                                  border: "1px solid var(--accent-border)",
+                                }
+                              : { background: "rgba(255,255,255,0.05)", color: "#8fa3b8" }
+                          }
+                        >
+                          {step.status}
+                        </span>
                       </div>
                     </div>
                     <p className="mt-2 text-secondary text-[11px] leading-relaxed pl-7">{step.detail}</p>
@@ -201,10 +297,16 @@ export const SimulatedEnvironment: React.FC = () => {
             </div>
           </div>
 
-          {/* Audit Trail Panel — appears after simulation completes */}
-          <div className={`bg-[#0d1a0d]/80 rounded-xl border transition-all duration-500 p-4 ${
-            showAudit ? "border-emerald-700/50 opacity-100" : "border-white/[0.04] opacity-30"
-          }`}>
+          {/* Audit Trail Panel */}
+          <div
+            className={`rounded-xl border transition-all duration-500 p-4 ${
+              showAudit ? "opacity-100" : "opacity-30"
+            }`}
+            style={{
+              background: "#0d1a0d80",
+              border: showAudit ? "1px solid rgba(52,211,153,0.4)" : "1px solid var(--border-neutral)",
+            }}
+          >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${showAudit ? "bg-emerald-400 animate-pulse" : "bg-white/20"}`} />

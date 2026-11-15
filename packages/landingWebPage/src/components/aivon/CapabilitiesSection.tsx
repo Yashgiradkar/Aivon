@@ -9,14 +9,20 @@ export const CapabilitiesSection: React.FC = () => {
     <div className="w-full space-y-8">
       {/* Section Header */}
       <div className="space-y-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-gold/10 border border-gold/30">
-          <span className="text-gold font-mono text-[11px] font-bold uppercase tracking-wider">
+        <div
+          className="inline-flex items-center gap-2 px-3 py-1 rounded-md"
+          style={{ background: "rgba(79,140,255,0.08)", border: "1px solid var(--accent-border)" }}
+        >
+          <span
+            className="font-mono text-[11px] font-bold uppercase tracking-wider"
+            style={{ color: "var(--accent-soft)" }}
+          >
             Deep System Capabilities
           </span>
         </div>
         <h3 className="text-white font-black text-2xl sm:text-3xl lg:text-4xl leading-tight">
           Engineered for constraints:{" "}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold via-gold-light to-white">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F8CFF] via-[#7FB2FF] to-white">
             10 production pillars.
           </span>
         </h3>
@@ -26,24 +32,38 @@ export const CapabilitiesSection: React.FC = () => {
       </div>
 
       {/* Tabs Grid — 5 per row */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-1.5 bg-black-200/90 rounded-2xl border border-white/[0.08]">
+      <div
+        className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-1.5 rounded-2xl"
+        style={{ background: "var(--surface-card)", border: "1px solid var(--border-neutral)" }}
+      >
         {tenCapabilities.map((item, idx) => {
           const isSelected = idx === selectedCapIndex;
           return (
             <button
               key={item.id}
               onClick={() => setSelectedCapIndex(idx)}
-              className={`p-3 rounded-xl text-left transition-all cursor-pointer ${
+              className="p-3 rounded-xl text-left transition-all cursor-pointer card-toplight"
+              style={
                 isSelected
-                  ? "bg-tertiary border border-gold/60 shadow-[0_4px_16px_rgba(214,168,75,0.15)]"
-                  : "hover:bg-white/[0.04] border border-transparent"
-              }`}
+                  ? {
+                      background: "var(--surface-card-alt)",
+                      border: "1px solid var(--accent-border)",
+                      boxShadow: "0 4px 16px rgba(79,140,255,0.10)",
+                    }
+                  : { border: "1px solid transparent" }
+              }
             >
               <div className="flex items-center justify-between">
                 <span className="text-lg">{item.icon}</span>
-                <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-gold animate-pulse" : "bg-white/20"}`} />
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${isSelected ? "animate-pulse" : "bg-white/20"}`}
+                  style={isSelected ? { background: "var(--accent-primary)" } : {}}
+                />
               </div>
-              <p className={`mt-1 text-xs font-semibold truncate ${isSelected ? "text-gold" : "text-secondary"}`}>
+              <p
+                className="mt-1 text-xs font-semibold truncate"
+                style={{ color: isSelected ? "var(--accent-primary)" : "#8fa3b8" }}
+              >
                 {item.heading.split(" ").slice(0, 3).join(" ")}
               </p>
             </button>
@@ -52,7 +72,13 @@ export const CapabilitiesSection: React.FC = () => {
       </div>
 
       {/* Detail Panel */}
-      <div className="rounded-2xl bg-gradient-to-br from-tertiary/80 via-[#13110e] to-black-200/90 border border-white/[0.1] p-6 sm:p-8 space-y-6 transition-all duration-300">
+      <div
+        className="rounded-2xl p-6 sm:p-8 space-y-6 transition-all duration-300 card-toplight"
+        style={{
+          background: "linear-gradient(145deg, var(--surface-thesis-from), var(--surface-thesis-to))",
+          border: "1px solid var(--accent-border)",
+        }}
+      >
         {/* Cap Header */}
         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
           <span className="text-4xl">{cap.icon}</span>
@@ -60,19 +86,39 @@ export const CapabilitiesSection: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2">
               <h4 className="text-white font-black text-xl sm:text-2xl">{cap.heading}</h4>
               {cap.badge && (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-gold/15 text-gold border border-gold/40">
+                <span
+                  className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold"
+                  style={{
+                    background: "rgba(79,140,255,0.12)",
+                    color: "var(--accent-soft)",
+                    border: "1px solid var(--accent-border)",
+                  }}
+                >
                   {cap.badge}
                 </span>
               )}
             </div>
-            <p className="text-gold text-sm font-medium">{cap.subheading}</p>
+            <p className="text-sm font-medium" style={{ color: "var(--accent-primary)" }}>
+              {cap.subheading}
+            </p>
           </div>
         </div>
 
         {/* Punchline */}
-        <div className="p-4 rounded-xl bg-gold/8 border border-gold/25 flex items-start gap-3">
-          <span className="text-gold text-lg mt-0.5">💡</span>
-          <p className="text-[#f2dfbd] text-sm font-semibold italic leading-relaxed">"{cap.punchline}"</p>
+        <div
+          className="p-4 rounded-xl flex items-start gap-3"
+          style={{
+            background: "rgba(79,140,255,0.06)",
+            border: "1px solid var(--accent-border)",
+          }}
+        >
+          <span className="text-lg mt-0.5">💡</span>
+          <p
+            className="text-sm font-semibold italic leading-relaxed"
+            style={{ color: "var(--accent-soft)" }}
+          >
+            &ldquo;{cap.punchline}&rdquo;
+          </p>
         </div>
 
         {/* Body */}
@@ -80,11 +126,25 @@ export const CapabilitiesSection: React.FC = () => {
 
         {/* Tech Details */}
         <div>
-          <p className="text-xs font-mono font-bold text-gold uppercase tracking-wider mb-3">Engineering Details</p>
+          <p
+            className="text-xs font-mono font-bold uppercase tracking-wider mb-3"
+            style={{ color: "var(--accent-primary)" }}
+          >
+            Engineering Details
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {cap.techDetails.map((detail, i) => (
-              <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg bg-black-100/60 border border-white/[0.06]">
-                <span className="text-gold text-xs mt-0.5 font-bold flex-shrink-0">▸</span>
+              <div
+                key={i}
+                className="flex items-start gap-2 p-2.5 rounded-lg card-toplight"
+                style={{ background: "var(--surface-card)", border: "1px solid var(--border-neutral)" }}
+              >
+                <span
+                  className="text-xs mt-0.5 font-bold flex-shrink-0"
+                  style={{ color: "var(--accent-primary)" }}
+                >
+                  ▸
+                </span>
                 <span className="text-secondary text-xs leading-relaxed">{detail}</span>
               </div>
             ))}

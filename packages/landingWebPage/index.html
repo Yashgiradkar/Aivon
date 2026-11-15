@@ -21,13 +21,17 @@
         theme: {
           extend: {
             colors: {
-              primary: "#05070d",
-              secondary: "#b7ae9d",
-              tertiary: "#17130e",
-              "black-100": "#100d09",
-              "black-200": "#0a0907",
-              gold: "#d6a84b",
-              "gold-light": "#ffd784",
+              /* Page base — unchanged */
+              primary:    "#05070d",
+              /* Neutral text */
+              secondary:  "#8fa3b8",
+              /* Dark card surface — replaces warm brown tertiary */
+              tertiary:   "#080C14",
+              "black-100": "#080C14",
+              "black-200": "#060A11",
+              /* Accent system — rich executive blue */
+              gold:        "#4F8CFF",   /* accent-primary  */
+              "gold-light": "#7FB2FF",  /* accent-soft     */
             },
             fontFamily: {
               sans: ["'Plus Jakarta Sans'", "sans-serif"],
@@ -38,6 +42,22 @@
       };
     </script>
     <style>
+      /* ── Design token definitions ───────────────────────────────── */
+      :root {
+        --accent-primary:  #4F8CFF;
+        --accent-strong:   #2563EB;
+        --accent-deep:     #1D4ED8;
+        --accent-soft:     #7FB2FF;
+        --accent-border:   rgba(79,140,255,0.22);
+        --accent-glow:     rgba(79,140,255,0.12);
+
+        --surface-card:          #080C14;
+        --surface-card-alt:      #0B1120;
+        --surface-thesis-from:   #080D18;
+        --surface-thesis-to:     #0C1426;
+        --border-neutral:        rgba(255,255,255,0.06);
+      }
+
       body {
         background-color: #05070d;
         color: #f7f1e6;
@@ -46,23 +66,62 @@
         padding: 0;
         overflow-x: hidden;
       }
+
       ::selection {
-        background: #d6a84b;
-        color: #17130e;
+        background: var(--accent-primary);
+        color: #fff;
       }
-      /* Custom glowing scrollbar */
-      ::-webkit-scrollbar {
-        width: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #05070d;
-      }
+
+      /* Scrollbar */
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: #05070d; }
       ::-webkit-scrollbar-thumb {
-        background: #2b2115;
+        background: #0d1829;
         border-radius: 4px;
       }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #d6a84b;
+      ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+
+      /* Focus ring */
+      *:focus-visible {
+        outline: 2px solid var(--accent-primary);
+        outline-offset: 2px;
+      }
+
+      /* Hairline top-light on cards (applied via utility classes below) */
+      .card-toplight {
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+      }
+
+      /* Gradient text helper for thesis quote */
+      .text-gradient-blue {
+        background: linear-gradient(90deg, #7FB2FF, #4F8CFF);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      /* Primary CTA button */
+      .btn-primary {
+        background: linear-gradient(135deg, #4F8CFF, #2563EB);
+        color: #fff;
+        transition: box-shadow 0.2s, transform 0.15s;
+      }
+      .btn-primary:hover {
+        box-shadow: 0 8px 30px var(--accent-glow);
+        transform: translateY(-1px);
+      }
+      .btn-primary:active { transform: scale(0.97); }
+
+      /* Secondary outline buttons */
+      .btn-secondary {
+        background: transparent;
+        border: 1px solid var(--accent-border);
+        color: #fff;
+        transition: border-color 0.2s, box-shadow 0.2s;
+      }
+      .btn-secondary:hover {
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 12px var(--accent-glow);
       }
     </style>
   </head>

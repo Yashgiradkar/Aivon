@@ -9,15 +9,21 @@ export const ArchitectureShowcase: React.FC = () => {
     <div className="w-full space-y-8">
       {/* Section Header */}
       <div className="space-y-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-gold/10 border border-gold/30">
-          <span className="text-gold font-mono text-[11px] font-bold uppercase tracking-wider">
+        <div
+          className="inline-flex items-center gap-2 px-3 py-1 rounded-md"
+          style={{ background: "rgba(79,140,255,0.08)", border: "1px solid var(--accent-border)" }}
+        >
+          <span
+            className="font-mono text-[11px] font-bold uppercase tracking-wider"
+            style={{ color: "var(--accent-soft)" }}
+          >
             System Topology
           </span>
         </div>
 
         <h3 className="text-white font-black text-2xl sm:text-3xl lg:text-4xl leading-tight">
           Enterprise architecture:{" "}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold via-gold-light to-white">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F8CFF] via-[#7FB2FF] to-white">
             the 5-tier system blueprint.
           </span>
         </h3>
@@ -38,18 +44,37 @@ export const ArchitectureShowcase: React.FC = () => {
               <button
                 key={layer.id}
                 onClick={() => setSelectedLayerIndex(idx)}
-                className={`w-full p-4 rounded-xl text-left border transition-all cursor-pointer flex items-center justify-between ${
+                className="w-full p-4 rounded-xl text-left transition-all cursor-pointer flex items-center justify-between card-toplight"
+                style={
                   isSelected
-                    ? "bg-tertiary border-gold shadow-[0_0_20px_rgba(214,168,75,0.2)]"
-                    : "bg-black-100/80 border-white/[0.06] hover:border-gold/30 hover:bg-tertiary/40"
-                }`}
+                    ? {
+                        background: "var(--surface-card-alt)",
+                        border: "1px solid var(--accent-border)",
+                        boxShadow: "0 0 20px rgba(79,140,255,0.10)",
+                      }
+                    : {
+                        background: "var(--surface-card)",
+                        border: "1px solid var(--border-neutral)",
+                      }
+                }
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--accent-border)";
+                    (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-card-alt)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-neutral)";
+                    (e.currentTarget as HTMLButtonElement).style.background = "var(--surface-card)";
+                  }
+                }}
               >
                 <div>
                   <div className="flex items-center gap-2">
                     <span
-                      className={`font-mono text-[11px] font-bold ${
-                        isSelected ? "text-gold" : "text-secondary"
-                      }`}
+                      className="font-mono text-[11px] font-bold"
+                      style={{ color: isSelected ? "var(--accent-primary)" : "#8fa3b8" }}
                     >
                       LAYER 0{layer.layer}
                     </span>
@@ -61,9 +86,9 @@ export const ArchitectureShowcase: React.FC = () => {
                 </div>
 
                 <span
-                  className={`text-lg transition-transform ${
-                    isSelected ? "text-gold translate-x-1" : "text-secondary"
-                  }`}
+                  className="text-lg transition-transform"
+                  style={{ color: isSelected ? "var(--accent-primary)" : "#8fa3b8",
+                           transform: isSelected ? "translateX(4px)" : "none" }}
                 >
                   →
                 </span>
@@ -74,16 +99,32 @@ export const ArchitectureShowcase: React.FC = () => {
 
         {/* Selected Layer In-Depth Components (7 cols) */}
         <div className="lg:col-span-7">
-          <div className="h-full p-6 sm:p-7 rounded-2xl bg-gradient-to-br from-tertiary via-black-200 to-tertiary border border-gold/40 flex flex-col justify-between space-y-6 transition-all duration-300">
+          <div
+            className="h-full p-6 sm:p-7 rounded-2xl flex flex-col justify-between space-y-6 transition-all duration-300 card-toplight"
+            style={{
+              background: "linear-gradient(145deg, var(--surface-thesis-from), var(--surface-thesis-to))",
+              border: "1px solid var(--accent-border)",
+            }}
+          >
             <div>
               <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
                 <div>
-                  <span className="text-[10px] font-mono text-gold uppercase tracking-widest font-bold">
+                  <span
+                    className="text-[10px] font-mono uppercase tracking-widest font-bold"
+                    style={{ color: "var(--accent-soft)" }}
+                  >
                     Layer 0{activeLayer.layer} Blueprint
                   </span>
                   <h4 className="text-xl font-bold text-white mt-0.5">{activeLayer.name}</h4>
                 </div>
-                <span className="px-2.5 py-1 text-xs font-mono rounded bg-gold/15 text-gold border border-gold/40">
+                <span
+                  className="px-2.5 py-1 text-xs font-mono rounded"
+                  style={{
+                    background: "rgba(79,140,255,0.12)",
+                    color: "var(--accent-soft)",
+                    border: "1px solid var(--accent-border)",
+                  }}
+                >
                   {activeLayer.badge}
                 </span>
               </div>
@@ -97,10 +138,20 @@ export const ArchitectureShowcase: React.FC = () => {
                 {activeLayer.items.map((item, idx) => (
                   <div
                     key={idx}
-                    className="p-3.5 rounded-xl bg-black-100/90 border border-white/[0.05] hover:border-gold/30 transition-colors"
+                    className="p-3.5 rounded-xl transition-colors card-toplight"
+                    style={{ background: "var(--surface-card)", border: "1px solid var(--border-neutral)" }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.borderColor = "var(--accent-border)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-neutral)";
+                    }}
                   >
                     <p className="text-white text-xs sm:text-sm font-bold flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-gold" />
+                      <span
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ background: "var(--accent-primary)" }}
+                      />
                       {item.title}
                     </p>
                     <p className="mt-1 text-secondary text-xs font-mono leading-relaxed pl-3.5">
@@ -114,24 +165,33 @@ export const ArchitectureShowcase: React.FC = () => {
             {/* Status footer */}
             <div className="pt-4 border-t border-white/[0.08] flex items-center justify-between text-[11px] font-mono text-secondary">
               <span>Reactive Mutation Bus: Active</span>
-              <span className="text-gold">Zero Hardcoded Endpoints</span>
+              <span style={{ color: "var(--accent-primary)" }}>Zero Hardcoded Endpoints</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Multi-Model Architectural Flexibility Strip */}
-      <div className="p-6 rounded-2xl bg-gradient-to-r from-black-200 via-tertiary to-black-200 border border-white/[0.08] flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div
+        className="p-6 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-6 card-toplight"
+        style={{
+          background: "linear-gradient(to right, var(--surface-card), var(--surface-card-alt), var(--surface-card))",
+          border: "1px solid var(--border-neutral)",
+        }}
+      >
         <div className="space-y-1 max-w-xl">
           <div className="flex items-center gap-2">
-            <span className="text-gold font-mono text-xs font-bold uppercase tracking-wider">
+            <span
+              className="font-mono text-xs font-bold uppercase tracking-wider"
+              style={{ color: "var(--accent-primary)" }}
+            >
               Multi-Model Neutrality
             </span>
             <span className="text-secondary text-xs">•</span>
             <span className="text-white text-xs font-mono">Architectural Agnosticism</span>
           </div>
           <p className="text-white font-bold text-base sm:text-lg">
-            "Model choice is an architectural concern, not a hardcoded dependency."
+            &ldquo;Model choice is an architectural concern, not a hardcoded dependency.&rdquo;
           </p>
           <p className="text-secondary text-xs sm:text-[13px] leading-relaxed">
             The agent runtime decouples prompt templates and tool definitions from provider SDKs. Teams can hot-swap
@@ -147,11 +207,18 @@ export const ArchitectureShowcase: React.FC = () => {
           ].map((provider) => (
             <div
               key={provider.name}
-              className="p-3 rounded-xl bg-black-100/90 border border-gold/30 text-left min-w-[140px]"
+              className="p-3 rounded-xl text-left min-w-[140px] card-toplight"
+              style={{
+                background: "var(--surface-card)",
+                border: "1px solid var(--accent-border)",
+              }}
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-white text-xs font-bold">{provider.name}</span>
-                <span className="text-[9px] font-mono text-gold px-1.5 py-0.5 rounded bg-gold/10">
+                <span
+                  className="text-[9px] font-mono px-1.5 py-0.5 rounded"
+                  style={{ color: "var(--accent-soft)", background: "rgba(79,140,255,0.08)" }}
+                >
                   {provider.pill}
                 </span>
               </div>
@@ -163,4 +230,3 @@ export const ArchitectureShowcase: React.FC = () => {
     </div>
   );
 };
-

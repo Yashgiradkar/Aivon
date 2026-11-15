@@ -14,9 +14,22 @@ export const AivonFlagship: React.FC = () => {
       <div className="space-y-8">
         {/* Eyebrow & Badges */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-gold/20 to-[#b9792e]/10 border border-gold/50">
-            <span className="w-2.5 h-2.5 rounded-full bg-gold animate-pulse" />
-            <span className="text-[#f2dfbd] font-mono text-xs font-bold uppercase tracking-[0.18em]">
+          {/* Primary eyebrow — blue accent */}
+          <div
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full"
+            style={{
+              background: "rgba(79,140,255,0.08)",
+              border: "1px solid var(--accent-border)",
+            }}
+          >
+            <span
+              className="w-2.5 h-2.5 rounded-full animate-pulse"
+              style={{ background: "var(--accent-primary)" }}
+            />
+            <span
+              className="font-mono text-xs font-bold uppercase tracking-[0.18em]"
+              style={{ color: "var(--accent-soft)" }}
+            >
               FLAGSHIP PROJECT / AI SYSTEM
             </span>
           </div>
@@ -32,7 +45,7 @@ export const AivonFlagship: React.FC = () => {
           <h2 className="text-white font-black text-3xl sm:text-5xl lg:text-[56px] leading-[1.1] tracking-tight">
             AI is easy to demo.{" "}
             <br className="hidden sm:inline" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-gold via-gold-light to-white">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F8CFF] via-[#7FB2FF] to-white">
               Engineering it for the real world is the hard part.
             </span>
           </h2>
@@ -42,7 +55,10 @@ export const AivonFlagship: React.FC = () => {
             into real-time customer conversations.
           </p>
 
-          <p className="text-[#f2dfbd] text-sm sm:text-base font-semibold leading-relaxed max-w-3xl">
+          <p
+            className="text-sm sm:text-base font-semibold leading-relaxed max-w-3xl"
+            style={{ color: "var(--accent-soft)" }}
+          >
             Don&apos;t wonder where the answer came from. Audit logs ground every reply in the PDF, image, chart, table, or text it actually used — then the queue hands the hard ones to a person.
           </p>
           <p className="text-secondary text-sm sm:text-base leading-relaxed max-w-3xl">
@@ -51,11 +67,24 @@ export const AivonFlagship: React.FC = () => {
         </div>
 
         {/* Quick Launch & Verification Strip */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-gold/20 via-tertiary to-black-100 border border-gold/30">
+        <div
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl card-toplight"
+          style={{
+            background: "linear-gradient(135deg, var(--surface-card), var(--surface-card-alt))",
+            border: "1px solid var(--accent-border)",
+          }}
+        >
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-white font-bold text-sm sm:text-base">Aivon Production Deployment</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-gold/15 text-gold border border-gold/40">
+              <span
+                className="text-[10px] font-mono px-2 py-0.5 rounded"
+                style={{
+                  background: "rgba(79,140,255,0.12)",
+                  color: "var(--accent-soft)",
+                  border: "1px solid var(--accent-border)",
+                }}
+              >
                 Live on Vercel
               </span>
             </div>
@@ -69,7 +98,7 @@ export const AivonFlagship: React.FC = () => {
               href="https://aivon-dashboard.vercel.app/"
               target="_blank"
               rel="noopener noreferrer"
-              className="bg-gradient-to-r from-gold to-[#b9792e] hover:opacity-90 text-[#17130e] font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-lg shadow-gold/25 flex items-center gap-2 transition-all active:scale-95 flex-shrink-0"
+              className="btn-primary font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl flex items-center gap-2 flex-shrink-0"
             >
               Launch Dashboard ↗
             </a>
@@ -77,7 +106,7 @@ export const AivonFlagship: React.FC = () => {
               href="https://github.com/Yashgiradkar/Aivon"
               target="_blank"
               rel="noopener noreferrer"
-              className="bg-tertiary/90 hover:bg-tertiary border border-white/10 hover:border-gold/40 text-white font-medium text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center gap-2 transition-colors flex-shrink-0"
+              className="btn-secondary font-medium text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center gap-2 flex-shrink-0"
             >
               GitHub Source ↗
             </a>
@@ -113,4 +142,3 @@ export const AivonFlagship: React.FC = () => {
 
 export default AivonFlagship;
 export { AivonFlagship as landingWebPage };
-
