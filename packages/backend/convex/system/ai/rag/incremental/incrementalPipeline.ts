@@ -12,7 +12,7 @@ import { ChunkEmbeddingCache } from "./chunkEmbeddingCache";
 import { DocumentManifestStore } from "./manifestStore";
 import { DiffEngine } from "./diffEngine";
 import { TenantBM25Cache } from "../bm25";
-import { MultiTenantRetrievalCache } from "../../cache/retrievalCache";
+import { MultiTenantRetrievalCache, SemanticAnswerKVCache } from "../../cache";
 
 /**
  * Default production embedding provider utilizing OpenAI text-embedding-3-small.
@@ -162,6 +162,7 @@ export class IncrementalRAGPipeline {
     // 8. Invalidate tenant lexical (BM25) and semantic retrieval caches
     TenantBM25Cache.invalidate(organizationId);
     MultiTenantRetrievalCache.invalidateOrg(organizationId);
+    SemanticAnswerKVCache.invalidateOrg(organizationId);
 
     const processingTimeMs = Date.now() - startTime;
 

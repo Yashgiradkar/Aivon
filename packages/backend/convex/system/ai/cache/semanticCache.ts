@@ -8,6 +8,8 @@
  * 4. Provider prompt prefix alignment (OpenAI & Anthropic KV cache reuse)
  */
 
+import { ProductionKVCache } from "./kvCache";
+
 export interface CacheEligibilityResult {
   eligible: boolean;
   reason?: string;
@@ -17,6 +19,53 @@ export interface PromptPrefixConfig {
   systemPrompt: string;
   toolDefinitions?: string;
   dynamicContext: string;
+}
+
+export interface CachedSemanticAnswer {
+  cacheId?: string;
+  response: string;
+  evidenceReferences: string[];
+  canonicalQuery: string;
+  model: string;
+}
+
+export class SemanticAnswerKVCache {
+  private static l1Cache = new ProductionKVCache<CachedSemanticAnswer>({
+    maxEntries: 2000,
+    defaultTtlMs: 15 * 60 * 1000, // 15 min L1 in-memory TTL
+    namespace: "semantic_answer",
+    version: "v1",
+  });
+
+  public static get(orgId: string, query: string): CachedSemanticAnswer | null {
+    if (!orgId || !query) return null;
+    const normalized = SemanticCacheLogic.normalizeQuery(query);
+    return this.l1Cache.get(orgId, normalized);
+  }
+
+  public static set(
+    orgId: string,
+    query: string,
+    entry: CachedSemanticAnswer,
+    ttlMs?: number
+  ): void {
+    if (!orgId || !query) return;
+    const normalized = SemanticCacheLogic.normalizeQuery(query);
+    this.l1Cache.set(orgId, normalized, entry, { ttlMs });
+  }
+
+  public static invalidateOrg(orgId: string): void {
+    if (!orgId) return;
+    this.l1Cache.invalidateTenant(orgId);
+  }
+
+  public static getStats() {
+    return this.l1Cache.getStats();
+  }
+
+  public static clear(): void {
+    this.l1Cache.clear();
+  }
 }
 
 export class SemanticCacheLogic {

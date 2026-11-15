@@ -232,6 +232,7 @@ export class BM25Index {
 export class TenantBM25Cache {
   private static indices = new Map<string, { index: BM25Index; timestamp: number }>();
   private static readonly TTL_MS = 30 * 60 * 1000; // 30 minutes
+  private static readonly MAX_ENTRIES = 50; // Maximum tenant indices per container
 
   public static get(orgId: string): BM25Index | null {
     const entry = this.indices.get(orgId);
@@ -240,10 +241,22 @@ export class TenantBM25Cache {
       this.indices.delete(orgId);
       return null;
     }
+    // Refresh LRU order
+    this.indices.delete(orgId);
+    this.indices.set(orgId, entry);
     return entry.index;
   }
 
   public static set(orgId: string, index: BM25Index): void {
+    if (this.indices.has(orgId)) {
+      this.indices.delete(orgId);
+    } else if (this.indices.size >= this.MAX_ENTRIES) {
+      // Evict least recently used tenant index
+      const oldestKey = this.indices.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.indices.delete(oldestKey);
+      }
+    }
     this.indices.set(orgId, { index, timestamp: Date.now() });
   }
 
@@ -253,5 +266,9 @@ export class TenantBM25Cache {
 
   public static clear(): void {
     this.indices.clear();
+  }
+
+  public static size(): number {
+    return this.indices.size;
   }
 }

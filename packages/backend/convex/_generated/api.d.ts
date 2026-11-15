@@ -41,6 +41,7 @@ import type * as public_voiceSettings from "../public/voiceSettings.js";
 import type * as public_widgetSettings from "../public/widgetSettings.js";
 import type * as system_ai_agents_supportAgent from "../system/ai/agents/supportAgent.js";
 import type * as system_ai_cache_index from "../system/ai/cache/index.js";
+import type * as system_ai_cache_kvCache from "../system/ai/cache/kvCache.js";
 import type * as system_ai_cache_retrievalCache from "../system/ai/cache/retrievalCache.js";
 import type * as system_ai_cache_semanticCache from "../system/ai/cache/semanticCache.js";
 import type * as system_ai_constants from "../system/ai/constants.js";
@@ -160,6 +161,7 @@ declare const fullApi: ApiFromModules<{
   "public/widgetSettings": typeof public_widgetSettings;
   "system/ai/agents/supportAgent": typeof system_ai_agents_supportAgent;
   "system/ai/cache/index": typeof system_ai_cache_index;
+  "system/ai/cache/kvCache": typeof system_ai_cache_kvCache;
   "system/ai/cache/retrievalCache": typeof system_ai_cache_retrievalCache;
   "system/ai/cache/semanticCache": typeof system_ai_cache_semanticCache;
   "system/ai/constants": typeof system_ai_constants;

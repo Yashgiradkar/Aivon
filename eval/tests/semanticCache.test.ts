@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   SemanticCacheLogic,
+  SemanticAnswerKVCache,
 } from "../../packages/backend/convex/system/ai/cache/semanticCache";
 
 export async function runSemanticCacheTests(): Promise<void> {
@@ -70,6 +71,28 @@ export async function runSemanticCacheTests(): Promise<void> {
   assert.ok(promptOptimization.staticPrefix.includes("<static_tools>"));
   assert.ok(promptOptimization.dynamicSuffix.includes("Customer: What is your cancellation policy?"));
   assert.ok(promptOptimization.fullPrompt.startsWith(promptOptimization.staticPrefix));
+
+  // Test 7: Multi-Tenant L1 Semantic Answer KV Cache
+  SemanticAnswerKVCache.clear();
+  SemanticAnswerKVCache.set("org_faq", "What are your support hours?", {
+    response: "We offer 24/7 support via chat and phone.",
+    evidenceReferences: ["support_guide.md"],
+    canonicalQuery: "what are your support hours",
+    model: "gpt-4o-mini",
+  });
+
+  const hitFaq = SemanticAnswerKVCache.get("org_faq", "  What are your support hours?! ");
+  assert.ok(hitFaq !== null);
+  assert.equal(hitFaq?.response, "We offer 24/7 support via chat and phone.");
+  assert.deepEqual(hitFaq?.evidenceReferences, ["support_guide.md"]);
+
+  // Verify tenant isolation in semantic cache
+  const crossTenantFaq = SemanticAnswerKVCache.get("org_other", "What are your support hours?");
+  assert.equal(crossTenantFaq, null);
+
+  // Invalidate org
+  SemanticAnswerKVCache.invalidateOrg("org_faq");
+  assert.equal(SemanticAnswerKVCache.get("org_faq", "What are your support hours?"), null);
 
   console.log("✅ All Semantic Cache & Prompt Optimization Tests Passed Successfully!");
 }

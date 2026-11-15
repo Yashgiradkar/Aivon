@@ -9,6 +9,10 @@ import { OrchestrationExecutor } from "./executor";
 import { OrchestrationTelemetry } from "./observability";
 import { AuditMiddleware } from "../observability/auditMiddleware";
 import {
+  SemanticAnswerKVCache,
+  SemanticCacheLogic,
+} from "../cache";
+import {
   CapabilityContext,
   OrchestrationRequest,
   OrchestrationResponse,
@@ -130,6 +134,97 @@ export async function orchestrateConversationTurn(
   const routingCategory = ConversationRouter.classifyIntent(cleanPrompt);
   const plan = OrchestrationPlanner.createPlan(routingCategory, cleanPrompt);
 
+  // 4b. Two-Tier Semantic Answer KV Cache Check (L1 In-Memory + L2 Convex DB)
+  const isKnowledgeCandidate =
+    routingCategory === "knowledge_query" ||
+    routingCategory === "policy_exact_lookup";
+
+  const cacheEligibility = isKnowledgeCandidate
+    ? SemanticCacheLogic.evaluateEligibility(cleanPrompt, {
+        hasPersonalData: !!memoryContext,
+      })
+    : { eligible: false };
+
+  if (cacheEligibility.eligible) {
+    let cachedAnswer = SemanticAnswerKVCache.get(
+      request.organizationId,
+      cleanPrompt
+    );
+
+    if (!cachedAnswer && ctx && typeof ctx.runQuery === "function") {
+      try {
+        const dbEntry = await ctx.runQuery(
+          internal.system.cache.lookupSemanticCache,
+          {
+            organizationId: request.organizationId,
+            queryText: cleanPrompt,
+          }
+        );
+        if (dbEntry) {
+          cachedAnswer = {
+            cacheId: dbEntry.cacheId,
+            response: dbEntry.response,
+            evidenceReferences: dbEntry.evidenceReferences,
+            canonicalQuery: dbEntry.canonicalQuery,
+            model: dbEntry.model,
+          };
+          SemanticAnswerKVCache.set(
+            request.organizationId,
+            cleanPrompt,
+            cachedAnswer
+          );
+        }
+      } catch {
+        // Fallback cleanly on database lookup error
+      }
+    }
+
+    if (cachedAnswer) {
+      const cachedLatency = Date.now() - startTime;
+      const citations = (cachedAnswer.evidenceReferences || []).map((ref, idx) => ({
+        evidenceId: `CACHED-${idx + 1}`,
+        documentId: ref,
+        documentName: ref,
+        snippet: cachedAnswer!.response,
+        format: "prose" as const,
+      }));
+
+      if (cachedAnswer.cacheId && ctx && typeof ctx.runMutation === "function") {
+        ctx.runMutation(internal.system.cache.recordCacheHit, {
+          cacheId: cachedAnswer.cacheId as any,
+        }).catch(() => {});
+      }
+
+      OrchestrationTelemetry.logExecutionCompleted({
+        traceId,
+        organizationId: request.organizationId,
+        conversationId: request.conversationId,
+        threadId: request.threadId,
+        result: {
+          status: "success",
+          output: cachedAnswer.response,
+          latencyMs: cachedLatency,
+        },
+        totalLatencyMs: cachedLatency,
+        tokensUsed: 0,
+        routingCategory,
+      });
+
+      return {
+        executionId: `cached_${traceId}`,
+        status: "completed",
+        responseMessage: cachedAnswer.response,
+        routingCategory,
+        evidenceCitations: citations,
+        totalLatencyMs: cachedLatency,
+        totalTokensUsed: 0,
+        escalatedToHuman: false,
+        resolved: false,
+        plan,
+      };
+    }
+  }
+
   OrchestrationTelemetry.logPlanCreated({
     traceId,
     organizationId: request.organizationId,
@@ -205,6 +300,36 @@ export async function orchestrateConversationTurn(
     latencyMs: totalLatencyMs,
     totalTokensUsed,
   });
+
+  // 11. Write-Through to Semantic Answer KV Cache (L1 Memory + L2 DB)
+  if (
+    cacheEligibility.eligible &&
+    orchestrationStatus === "completed" &&
+    responseText &&
+    finalResult.status === "success" &&
+    finalResult.evidence &&
+    finalResult.evidence.length > 0
+  ) {
+    const evidenceRefs = finalResult.evidence.map(
+      (e) => e.documentName || e.documentId
+    );
+    SemanticAnswerKVCache.set(request.organizationId, cleanPrompt, {
+      response: responseText,
+      evidenceReferences: evidenceRefs,
+      canonicalQuery: cleanPrompt,
+      model: "gpt-4o-mini",
+    });
+
+    if (ctx && typeof ctx.runMutation === "function") {
+      ctx.runMutation(internal.system.cache.recordSemanticCacheEntry, {
+        organizationId: request.organizationId,
+        canonicalQuery: cleanPrompt,
+        response: responseText,
+        evidenceReferences: evidenceRefs,
+        model: "gpt-4o-mini",
+      }).catch(() => {});
+    }
+  }
 
   OrchestrationTelemetry.logExecutionCompleted({
     traceId,

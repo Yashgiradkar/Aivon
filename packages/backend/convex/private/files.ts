@@ -12,7 +12,7 @@ import { Id } from "../_generated/dataModel";
 import { paginationOptsValidator } from "convex/server";
 import { internal } from "../_generated/api";
 import { TenantBM25Cache } from "../system/ai/rag/bm25";
-import { MultiTenantRetrievalCache } from "../system/ai/cache";
+import { MultiTenantRetrievalCache, SemanticAnswerKVCache } from "../system/ai/cache";
 import {
   scanUploadForMalware,
   validateKnowledgeBaseUpload,
@@ -91,10 +91,14 @@ export const deleteFile = mutation({
       );
     }
 
-    // Invalidate both the BM25 index and the retrieval result cache so stale
-    // answers are not served after the document has been permanently deleted.
+    // Invalidate BM25 index, in-memory retrieval cache, and semantic answer caches (L1 & L2)
+    // so stale answers are never served after a document is deleted.
     TenantBM25Cache.invalidate(orgId);
     MultiTenantRetrievalCache.invalidateOrg(orgId);
+    SemanticAnswerKVCache.invalidateOrg(orgId);
+    await ctx.scheduler.runAfter(0, internal.system.cache.invalidateOrgCache, {
+      organizationId: orgId,
+    });
   },
 });
 
@@ -270,9 +274,14 @@ export const addFile = action({
       }
     }
 
-    // Invalidate both caches so the new document is immediately available.
+    // Invalidate BM25 index, in-memory retrieval cache, and semantic answer caches (L1 & L2)
+    // so the new document is immediately available and stale answers are purged.
     TenantBM25Cache.invalidate(orgId);
     MultiTenantRetrievalCache.invalidateOrg(orgId);
+    SemanticAnswerKVCache.invalidateOrg(orgId);
+    await ctx.runMutation(internal.system.cache.invalidateOrgCache, {
+      organizationId: orgId,
+    });
 
     return {
       url: await ctx.storage.getUrl(storageId),
