@@ -26,6 +26,23 @@ export interface LogPayload {
   error?: string;
 }
 
+function sanitizeLogDetails(obj: unknown): unknown {
+  if (typeof obj === "string") {
+    return maskPIIForLogging(obj);
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeLogDetails);
+  }
+  if (obj && typeof obj === "object") {
+    const sanitized: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      sanitized[k] = sanitizeLogDetails(v);
+    }
+    return sanitized;
+  }
+  return obj;
+}
+
 /**
  * Structured Observability Logger
  * Redacts secrets & PII, calculates cost metrics, and outputs clean JSON for log drains.
@@ -52,7 +69,7 @@ export function logAIOperation(payload: LogPayload): void {
     outputTokens: payload.outputTokens,
     costUsd,
     error: payload.error ? maskPIIForLogging(payload.error) : undefined,
-    details: payload.details,
+    details: payload.details ? (sanitizeLogDetails(payload.details) as Record<string, unknown>) : undefined,
   };
 
   // Structured single-line JSON log

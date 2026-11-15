@@ -3,6 +3,7 @@ import { internal } from "../_generated/api";
 import { action } from "../_generated/server";
 import { getSecretValue, parseSecretString } from "../lib/secrets";
 import { ConvexError } from "convex/values";
+import { isConfiguredDemoActor } from "../lib/requestSecurity";
 
 export const getAssistants = action({
   args: {},
@@ -25,11 +26,7 @@ export const getAssistants = action({
       });
     }
 
-    const isDemo =
-      identity.email?.toLowerCase().includes("demo") ||
-      orgId.toLowerCase().includes("demo");
-
-    if (isDemo) {
+    if (isConfiguredDemoActor(identity)) {
       return [
         {
           id: "demo-vapi-asst-1",
@@ -125,11 +122,7 @@ export const getPhoneNumbers = action({
       });
     }
 
-    const isDemo =
-      identity.email?.toLowerCase().includes("demo") ||
-      orgId.toLowerCase().includes("demo");
-
-    if (isDemo) {
+    if (isConfiguredDemoActor(identity)) {
       return [
         {
           id: "demo-phone-1",

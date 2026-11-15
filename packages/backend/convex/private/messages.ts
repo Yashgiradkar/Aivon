@@ -7,6 +7,8 @@ import { paginationOptsValidator } from "convex/server";
 import { saveMessage } from "@convex-dev/agent";
 import { openai } from "@ai-sdk/openai";
 import { OPERATOR_MESSAGE_ENHANCEMENT_PROMPT } from "../system/ai/constants";
+import { assertBoundedText, MAX_OPERATOR_PROMPT_LENGTH } from "../lib/requestSecurity";
+import { sanitizeUserInput } from "../system/ai/security";
 
 export const enhanceResponse = action({
   args: {
@@ -45,6 +47,25 @@ export const enhanceResponse = action({
       });
     }
 
+    const admission = await ctx.runMutation(
+      internal.system.rateLimits.checkAndAdmit,
+      {
+        organizationId: orgId,
+        estimatedTokens: 800,
+      },
+    );
+    if (!admission.allowed) {
+      throw new ConvexError({
+        code: "RATE_LIMITED",
+        message: "Organization rate limit reached. Please wait and try again.",
+      });
+    }
+
+    const prompt = sanitizeUserInput(
+      assertBoundedText(args.prompt, MAX_OPERATOR_PROMPT_LENGTH, "Prompt"),
+      MAX_OPERATOR_PROMPT_LENGTH,
+    ).sanitizedText;
+
     const response = await generateText({
       model: openai("gpt-4o-mini"),
       messages: [
@@ -54,7 +75,7 @@ export const enhanceResponse = action({
         },
         {
           role: "user",
-          content: args.prompt,
+          content: prompt,
         },
       ],
     });
@@ -110,6 +131,12 @@ export const create = mutation({
       });
     }
 
+    const prompt = assertBoundedText(
+      args.prompt,
+      MAX_OPERATOR_PROMPT_LENGTH,
+      "Message",
+    );
+
     if (conversation.status === "unresolved") {
       await ctx.db.patch(args.conversationId, {
         status: "escalated",
@@ -122,13 +149,13 @@ export const create = mutation({
       agentName: identity.familyName,
       message: {
         role: "assistant",
-        content: args.prompt,
+        content: prompt,
       },
     });
 
     // Denormalize last message preview onto conversation for fast list rendering
     await ctx.db.patch(args.conversationId, {
-      lastMessageText: args.prompt,
+      lastMessageText: prompt,
       lastMessageRole: "assistant",
       lastMessageAt: Date.now(),
     });

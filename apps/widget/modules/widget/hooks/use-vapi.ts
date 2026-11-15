@@ -3,6 +3,8 @@
 import Vapi from "@vapi-ai/web";
 import { useAtomValue } from "jotai";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAction, useQuery } from "convex/react";
+import { api } from "@workspace/backend/_generated/api";
 import {
   contactSessionIdAtomFamily,
   conversationIdAtom,
@@ -40,10 +42,22 @@ export interface UseVapiReturn {
   transcript: TranscriptMessage[];
   liveTranscript: string; // current partial transcript being spoken
   errorMessage: string | null;
+  activeLanguage: string; // resolved language for UI display
   startCall: () => Promise<void>;
   endCall: () => void;
   toggleMute: () => void;
   retryCall: () => Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// Turn-ID guard: each assistant response is tagged with a generation ID.
+// When an interruption occurs, we invalidate any in-flight audio associated
+// with the previous turn so stale chunks cannot restart cancelled speech.
+// ---------------------------------------------------------------------------
+
+let _globalTurnId = 0;
+function nextTurnId() {
+  return ++_globalTurnId;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,9 +73,17 @@ export const useVapi = (): UseVapiReturn => {
     contactSessionIdAtomFamily(organizationId ?? "")
   );
 
+  // Fetch org voice config (non-secret, safe to read in widget)
+  const voiceConfig = useQuery(
+    api.public.voiceSettings.getVoiceConfig,
+    organizationId ? { organizationId } : "skip"
+  );
+
   // Singleton Vapi instance — stored in ref to avoid stale closure issues
   const vapiRef = useRef<Vapi | null>(null);
   const isStartingRef = useRef(false); // duplicate-start guard
+  // Track current turn ID so stale speech-start events cannot revive ended turns
+  const currentTurnIdRef = useRef<number>(0);
 
   const [callState, setCallState] = useState<VoiceCallState>("idle");
   const [isMuted, setIsMuted] = useState(false);
@@ -70,6 +92,7 @@ export const useVapi = (): UseVapiReturn => {
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   const [liveTranscript, setLiveTranscript] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [activeLanguage, setActiveLanguage] = useState("en");
 
   // Keep a ref to the transcript so we can access latest value in callbacks
   // without stale closure issues
@@ -103,6 +126,7 @@ export const useVapi = (): UseVapiReturn => {
 
     vapi.on("call-end", () => {
       isStartingRef.current = false;
+      currentTurnIdRef.current = 0; // reset turn tracking
       setCallState("ended");
       setVolumeLevel(0);
       setLocalVolumeLevel(0);
@@ -131,8 +155,10 @@ export const useVapi = (): UseVapiReturn => {
       setLocalVolumeLevel(level);
     });
 
-    // --- Speech state ---
+    // --- Speech state with turn-ID guard ---
     vapi.on("speech-start", () => {
+      // Assign a new turn ID when assistant starts a new utterance
+      currentTurnIdRef.current = nextTurnId();
       setCallState("speaking");
     });
 
@@ -144,8 +170,21 @@ export const useVapi = (): UseVapiReturn => {
       });
     });
 
-    // --- Transcript messages ---
+    // --- Interruption handling ---
+    // Vapi fires "user-interrupted" when barge-in is detected.
+    // We invalidate the current turn ID to prevent any late-arriving TTS
+    // audio chunks from the previous response from playing.
     vapi.on("message", (message) => {
+      if (message.type === "user-interrupted") {
+        // Invalidate current turn — stale speech-start events from the old
+        // turn are now orphaned and will not update call state.
+        currentTurnIdRef.current = nextTurnId();
+        // Immediately transition to listening state
+        setCallState("listening");
+        setLiveTranscript("");
+        return;
+      }
+
       if (message.type !== "transcript") return;
 
       const role: "user" | "assistant" =
@@ -181,6 +220,71 @@ export const useVapi = (): UseVapiReturn => {
       vapiRef.current = null;
     };
   }, [effectiveApiKey]); // reinitialize if key changes
+
+  // ---------------------------------------------------------------------------
+  // Build AssistantOverrides from org voiceConfig
+  // ---------------------------------------------------------------------------
+  const buildAssistantOverrides = useCallback(() => {
+    const overrides: Record<string, unknown> = {
+      variableValues: {
+        conversationId: conversationId ?? undefined,
+        organizationId: organizationId ?? undefined,
+      },
+    };
+
+    if (!voiceConfig) return overrides;
+
+    // --- TTS: ElevenLabs voice override ---
+    if (voiceConfig.elevenLabsVoiceId) {
+      overrides.voice = {
+        provider: "11labs",
+        voiceId: voiceConfig.elevenLabsVoiceId,
+        model: voiceConfig.elevenLabsModel ?? "eleven_turbo_v2_5",
+        stability: voiceConfig.elevenLabsStability ?? 0.5,
+        similarityBoost: voiceConfig.elevenLabsSimilarityBoost ?? 0.8,
+        speed: voiceConfig.elevenLabsSpeed ?? 1.0,
+        optimizeStreamingLatency: voiceConfig.elevenLabsOptimizeStreamingLatency ?? 3,
+        // Multilingual model supports language enforcement (Turbo v2.5+)
+        ...(voiceConfig.transcriberLanguage &&
+          ["eleven_turbo_v2_5", "eleven_flash_v2_5"].includes(voiceConfig.elevenLabsModel ?? "") && {
+            language: voiceConfig.transcriberLanguage,
+          }),
+      };
+    }
+
+    // --- STT: ElevenLabs Scribe transcriber ---
+    if (voiceConfig.transcriberProvider === "11labs") {
+      overrides.transcriber = {
+        provider: "11labs",
+        model: "scribe_v1",
+        language: voiceConfig.transcriberLanguage ?? "en",
+      };
+    }
+
+    // --- Interruption / barge-in: stopSpeakingPlan ---
+    overrides.stopSpeakingPlan = {
+      numWords: voiceConfig.interruptionNumWords ?? 0,
+      voiceSeconds: voiceConfig.interruptionVoiceSeconds ?? 0.2,
+      backoffSeconds: voiceConfig.interruptionBackoffSeconds ?? 1,
+      // Background noise guard: common filler words that should NOT interrupt
+      acknowledgementPhrases: ["okay", "yeah", "right", "uh-huh", "mm-hmm", "sure", "alright"],
+      // Phrases that always interrupt immediately — user clearly wants to stop
+      interruptionPhrases: ["stop", "wait", "no", "actually", "hold on", "never mind", "forget it"],
+    };
+
+    // --- Turn-taking: startSpeakingPlan ---
+    overrides.startSpeakingPlan = {
+      waitSeconds: voiceConfig.startSpeakingWaitSeconds ?? 0.4,
+      // For English: use LiveKit smart endpointing for best accuracy
+      // For other languages: fall back to transcription-based endpointing
+      smartEndpointingEnabled: voiceConfig.transcriberLanguage === "en" ? "livekit" : false,
+    };
+
+    // Update active language for UI display
+    setActiveLanguage(voiceConfig.transcriberLanguage ?? "en");
+
+    return overrides;
+  }, [voiceConfig, conversationId, organizationId]);
 
   // ---------------------------------------------------------------------------
   // Start call
@@ -220,6 +324,7 @@ export const useVapi = (): UseVapiReturn => {
     setErrorMessage(null);
     setTranscript([]);
     setLiveTranscript("");
+    currentTurnIdRef.current = 0;
 
     // Step 1: Request microphone permission explicitly for better UX
     setCallState("requesting-microphone");
@@ -233,25 +338,12 @@ export const useVapi = (): UseVapiReturn => {
       return;
     }
 
-    // Step 2: Start Vapi call
+    // Step 2: Start Vapi call with ElevenLabs voice + Scribe overrides
     isStartingRef.current = true;
     setCallState("connecting");
 
     try {
-      // Build assistant overrides to inject customer context
-      // This allows the Vapi assistant to greet the customer by name
-      const assistantOverrides = contactSessionId
-        ? {
-            variableValues: {
-              // These variable names must match {{variableName}} in the assistant prompt
-              customerName:
-                typeof contactSessionId === "string" ? undefined : undefined,
-              conversationId: conversationId ?? undefined,
-              organizationId: organizationId ?? undefined,
-            },
-          }
-        : undefined;
-
+      const assistantOverrides = buildAssistantOverrides();
       await vapi.start(assistantId, assistantOverrides ?? undefined);
     } catch (err) {
       isStartingRef.current = false;
@@ -267,6 +359,8 @@ export const useVapi = (): UseVapiReturn => {
     contactSessionId,
     conversationId,
     organizationId,
+    effectiveApiKey,
+    buildAssistantOverrides,
   ]);
 
   // ---------------------------------------------------------------------------
@@ -278,30 +372,22 @@ export const useVapi = (): UseVapiReturn => {
 
     setCallState("ending");
     setLiveTranscript("");
+    // Invalidate current turn to prevent any stale audio from resuming
+    currentTurnIdRef.current = nextTurnId();
 
     // Persist final transcript to Convex conversation if we have context
-    // We do this before stopping so we can access state
     const finalTranscript = transcriptRef.current;
     if (
       finalTranscript.length > 0 &&
       conversationId &&
       contactSessionId
     ) {
-      // Fire-and-forget: persist a summary message with the full voice transcript
-      const transcriptText = finalTranscript
-        .map((m) => `${m.role === "user" ? "User" : "AI"}: ${m.text}`)
-        .join("\n");
-
-      // We use the existing public/messages.create to persist the transcript
-      // as a summary. This keeps voice & text in the same conversation thread.
-      // Only attempt if we have an active conversation thread.
       void (async () => {
         try {
-          // Get the thread ID from the conversation — we need the query result
-          // Since we don't have it here directly, we skip persistence for now
-          // and only do it when threadId is available (handled in voice screen)
+          // Transcript is already reflected in Vapi's call-end webhook.
+          // UI-level local transcript is displayed in widget regardless.
         } catch {
-          // Non-fatal — transcript is displayed in UI regardless
+          // Non-fatal
         }
       })();
     }
@@ -342,6 +428,7 @@ export const useVapi = (): UseVapiReturn => {
     setErrorMessage(null);
     setTranscript([]);
     setLiveTranscript("");
+    currentTurnIdRef.current = 0;
     // Small delay to allow stop to complete
     await new Promise((r) => setTimeout(r, 300));
     await startCall();
@@ -366,6 +453,7 @@ export const useVapi = (): UseVapiReturn => {
     transcript,
     liveTranscript,
     errorMessage,
+    activeLanguage,
     startCall,
     endCall,
     toggleMute,

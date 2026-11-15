@@ -42,7 +42,7 @@ export const updateStatus = mutation({
 
     if (conversation.organizationId !== orgId) {
       throw new ConvexError({
-        code: "UNAUTHORZIED",
+        code: "UNAUTHORIZED",
         message: "Invalid Organization ID",
       });
     }
@@ -87,7 +87,7 @@ export const getOne = query({
 
     if (conversation.organizationId !== orgId) {
       throw new ConvexError({
-        code: "UNAUTHORZIED",
+        code: "UNAUTHORIZED",
         message: "Invalid Organization ID",
       });
     }

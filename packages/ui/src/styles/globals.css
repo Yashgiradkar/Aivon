@@ -181,3 +181,11 @@
     font-weight: 500;
   }
 }
+
+@keyframes tech-progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+.animate-tech-progress {
+  animation: tech-progress linear forwards;
+}

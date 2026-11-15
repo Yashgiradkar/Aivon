@@ -5,11 +5,12 @@ import { components } from "./_generated/api";
 import { supportAgent } from "./system/ai/agents/supportAgent";
 
 /**
- * Here we expose the API so the frontend can access it.
- * Authorization is handled by passing up an apiKey that can be generated
- * on the dashboard or via CLI via:
- * npx convex run --component agent apiKeys:issue
+ * Agent playground can list threads, fetch prompt context, and generate text.
+ * Keep it disabled unless AGENT_PLAYGROUND_ENABLED=true and a playground API
+ * key has been issued for a non-production deployment.
  */
+const playgroundEnabled = process.env.AGENT_PLAYGROUND_ENABLED === "true";
+
 export const {
   isApiKeyValid,
   listAgents,
@@ -20,5 +21,5 @@ export const {
   generateText,
   fetchPromptContext,
 } = definePlaygroundAPI(components.agent, {
-  agents: [supportAgent],
+  agents: playgroundEnabled ? [supportAgent] : [],
 });

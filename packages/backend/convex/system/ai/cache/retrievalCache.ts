@@ -1,40 +1,31 @@
 /**
- * Multi-Tenant In-Memory Retrieval Cache
+ * Multi-Tenant In-Memory Retrieval KV Cache
  *
- * Prevents redundant vector search calls for repeated queries within the same organization.
- * Strictly isolates cached responses by tenant ID.
+ * Prevents redundant vector search calls and lexical queries for repeated queries within the same organization.
+ * Strictly isolates cached responses by tenant ID, with bounded capacity, LRU eviction, and stampede protection.
  */
 
-interface CacheEntry {
+import { ProductionKVCache } from "./kvCache";
+
+export interface RetrievalCacheEntry {
   resultText: string;
   titles: string[];
-  expiresAt: number;
 }
 
-const cacheMap = new Map<string, CacheEntry>();
+const internalCache = new ProductionKVCache<RetrievalCacheEntry>({
+  maxEntries: 5000,
+  defaultTtlMs: 5 * 60 * 1000, // 5 minutes TTL
+  namespace: "retrieval",
+  version: "v1",
+});
 
 export class MultiTenantRetrievalCache {
-  private static defaultTtlMs = 5 * 60 * 1000; // 5 minutes TTL
-
-  private static makeKey(orgId: string, normalizedQuery: string): string {
-    return `${orgId}::${normalizedQuery.trim().toLowerCase()}`;
-  }
-
-  public static get(orgId: string, query: string): { resultText: string; titles: string[] } | null {
-    const key = this.makeKey(orgId, query);
-    const entry = cacheMap.get(key);
-
-    if (!entry) return null;
-
-    if (Date.now() > entry.expiresAt) {
-      cacheMap.delete(key);
-      return null;
-    }
-
-    return {
-      resultText: entry.resultText,
-      titles: entry.titles,
-    };
+  public static get(
+    orgId: string,
+    query: string
+  ): { resultText: string; titles: string[] } | null {
+    if (!orgId || !query) return null;
+    return internalCache.get(orgId, query);
   }
 
   public static set(
@@ -42,21 +33,56 @@ export class MultiTenantRetrievalCache {
     query: string,
     resultText: string,
     titles: string[],
-    ttlMs: number = this.defaultTtlMs
+    ttlMs?: number
   ): void {
-    const key = this.makeKey(orgId, query);
-    cacheMap.set(key, {
-      resultText,
-      titles,
-      expiresAt: Date.now() + ttlMs,
-    });
+    if (!orgId || !query) return;
+    const isNegative = !resultText || resultText.trim().length === 0;
+    internalCache.set(
+      orgId,
+      query,
+      { resultText, titles },
+      {
+        ttlMs,
+        isNegative,
+      }
+    );
+  }
+
+  /**
+   * Stampede-protected retrieval using Singleflight request coalescing.
+   */
+  public static async getOrFetch(
+    orgId: string,
+    query: string,
+    fetcher: () => Promise<{ resultText: string; titles: string[] }>,
+    ttlMs?: number
+  ): Promise<{ resultText: string; titles: string[] }> {
+    return await internalCache.getOrSet(
+      orgId,
+      query,
+      fetcher,
+      {
+        ttlMs,
+        negativeTtlMs: 60_000, // 1 min negative cache for empty results
+        isNegative: (val) => !val || !val.resultText || val.resultText.trim().length === 0,
+      }
+    );
   }
 
   public static invalidateOrg(orgId: string): void {
-    for (const key of cacheMap.keys()) {
-      if (key.startsWith(`${orgId}::`)) {
-        cacheMap.delete(key);
-      }
-    }
+    if (!orgId) return;
+    internalCache.invalidateTenant(orgId);
+  }
+
+  public static getStats() {
+    return internalCache.getStats();
+  }
+
+  public static clear(): void {
+    internalCache.clear();
+  }
+
+  public static pruneExpired(): number {
+    return internalCache.pruneExpired();
   }
 }

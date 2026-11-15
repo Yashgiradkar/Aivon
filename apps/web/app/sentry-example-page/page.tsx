@@ -15,6 +15,10 @@ export default function Page() {
   const [hasSentError, setHasSentError] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
 
+  if (process.env.NODE_ENV === "production") {
+    return null;
+  }
+
   useEffect(() => {
     Sentry.logger.info("Sentry example page loaded");
     async function checkConnectivity() {

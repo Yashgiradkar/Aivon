@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aivon — AI Customer Support Platform | Flagship Project Showcase</title>
+    <meta
+      name="description"
+      content="Aivon is a multi-tenant AI customer support platform combining RAG, agentic workflows, real-time chat, voice support, and enterprise BYOK security."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Tailwind CDN for instant standalone styling with no build dependency overhead -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              /* Page base — unchanged */
+              primary:    "#05070d",
+              /* Neutral text */
+              secondary:  "#8fa3b8",
+              /* Dark card surface — replaces warm brown tertiary */
+              tertiary:   "#080C14",
+              "black-100": "#080C14",
+              "black-200": "#060A11",
+              /* Accent system — rich executive blue */
+              gold:        "#4F8CFF",   /* accent-primary  */
+              "gold-light": "#7FB2FF",  /* accent-soft     */
+            },
+            fontFamily: {
+              sans: ["'Plus Jakarta Sans'", "sans-serif"],
+              mono: ["'JetBrains Mono'", "monospace"],
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      /* ── Design token definitions ───────────────────────────────── */
+      :root {
+        --accent-primary:  #4F8CFF;
+        --accent-strong:   #2563EB;
+        --accent-deep:     #1D4ED8;
+        --accent-soft:     #7FB2FF;
+        --accent-border:   rgba(79,140,255,0.22);
+        --accent-glow:     rgba(79,140,255,0.12);
+
+        --surface-card:          #080C14;
+        --surface-card-alt:      #0B1120;
+        --surface-thesis-from:   #080D18;
+        --surface-thesis-to:     #0C1426;
+        --border-neutral:        rgba(255,255,255,0.06);
+      }
+
+      body {
+        background-color: #05070d;
+        color: #f7f1e6;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+      }
+
+      ::selection {
+        background: var(--accent-primary);
+        color: #fff;
+      }
+
+      /* Scrollbar */
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: #05070d; }
+      ::-webkit-scrollbar-thumb {
+        background: #0d1829;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover { background: var(--accent-primary); }
+
+      /* Focus ring */
+      *:focus-visible {
+        outline: 2px solid var(--accent-primary);
+        outline-offset: 2px;
+      }
+
+      /* Hairline top-light on cards (applied via utility classes below) */
+      .card-toplight {
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+      }
+
+      /* Gradient text helper for thesis quote */
+      .text-gradient-blue {
+        background: linear-gradient(90deg, #7FB2FF, #4F8CFF);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      /* Primary CTA button */
+      .btn-primary {
+        background: linear-gradient(135deg, #4F8CFF, #2563EB);
+        color: #fff;
+        transition: box-shadow 0.2s, transform 0.15s;
+      }
+      .btn-primary:hover {
+        box-shadow: 0 8px 30px var(--accent-glow);
+        transform: translateY(-1px);
+      }
+      .btn-primary:active { transform: scale(0.97); }
+
+      /* Secondary outline buttons */
+      .btn-secondary {
+        background: transparent;
+        border: 1px solid var(--accent-border);
+        color: #fff;
+        transition: border-color 0.2s, box-shadow 0.2s;
+      }
+      .btn-secondary:hover {
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 12px var(--accent-glow);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

@@ -29,6 +29,7 @@ const PII_PATTERNS = {
   ssn: /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g,
   email: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
   phone: /\b(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
+  apiKey: /\b(?:sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16})\b/g,
 };
 
 export interface SanitizedInputResult {
@@ -78,7 +79,10 @@ export function sanitizeUserInput(
   // 4. PII Redacted copy for observability / logs
   let sanitizedForLogging = clean
     .replace(PII_PATTERNS.creditCard, "[REDACTED_CC]")
-    .replace(PII_PATTERNS.ssn, "[REDACTED_SSN]");
+    .replace(PII_PATTERNS.ssn, "[REDACTED_SSN]")
+    .replace(PII_PATTERNS.email, "[REDACTED_EMAIL]")
+    .replace(PII_PATTERNS.phone, "[REDACTED_PHONE]")
+    .replace(PII_PATTERNS.apiKey, "[REDACTED_API_KEY]");
 
   return {
     sanitizedText: clean,
@@ -95,7 +99,10 @@ export function maskPIIForLogging(text: string): string {
   if (!text) return "";
   return text
     .replace(PII_PATTERNS.creditCard, "[REDACTED_CC]")
-    .replace(PII_PATTERNS.ssn, "[REDACTED_SSN]");
+    .replace(PII_PATTERNS.ssn, "[REDACTED_SSN]")
+    .replace(PII_PATTERNS.email, "[REDACTED_EMAIL]")
+    .replace(PII_PATTERNS.phone, "[REDACTED_PHONE]")
+    .replace(PII_PATTERNS.apiKey, "[REDACTED_API_KEY]");
 }
 
 /**

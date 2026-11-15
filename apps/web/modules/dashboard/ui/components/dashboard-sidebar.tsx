@@ -9,6 +9,8 @@ import {
   LibraryBigIcon,
   Mic,
   PaletteIcon,
+  ScaleIcon,
+  Volume2Icon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -44,7 +46,13 @@ const customerSupportItems = [
     url: "/files",
     icon: LibraryBigIcon,
   },
+  {
+    title: "AI Quality & Evals",
+    url: "/evaluations",
+    icon: ScaleIcon,
+  },
 ];
+
 
 const configurationItems = [
   {
@@ -61,6 +69,11 @@ const configurationItems = [
     title: "Voice Assistant",
     url: "/plugins/vapi",
     icon: Mic,
+  },
+  {
+    title: "Voice Settings",
+    url: "/plugins/voice",
+    icon: Volume2Icon,
   },
 ];
 

@@ -47,6 +47,7 @@ convex/
 │   ├── queue.ts             # Operator queue list, agent presence, call completion
 │   ├── widgetSettings.ts    # Upsert widget settings
 │   ├── files.ts             # Knowledge base file upload/list/delete (RAG)
+│   ├── evaluations.ts       # Evaluation records, summaries & human reviews
 │   ├── plugins.ts           # Plugin registry (Vapi)
 │   ├── secrets.ts           # Secret upsert (triggers system action)
 │   └── vapi.ts              # Fetch Vapi assistants/phone numbers
@@ -54,9 +55,12 @@ convex/
 │   ├── ai/
 │   │   ├── agents/supportAgent.ts   # GPT-4o-mini agent definition
 │   │   ├── tools/
-│   │   │   ├── search.ts            # RAG vector search tool
+│   │   │   ├── search.ts            # RAG vector search tool (structure & intent-aware)
 │   │   │   ├── escalateConversation.ts # Escalates conversation & enqueues for human
 │   │   │   └── resolveConversation.ts
+│   │   ├── evaluation/              # LLM-as-a-Judge rubric (v2026.1), actions & mutations
+│   │   ├── rag/
+│   │   │   └── structure/           # Multi-format parsers & content block normalizers
 │   │   ├── constants.ts             # All LLM system prompts
 │   │   └── rag.ts                   # RAG instance (text-embedding-3-small, dim=1536)
 │   ├── queue.ts                     # Atomic FIFO matcher, position calculation & AI summaries
@@ -67,7 +71,7 @@ convex/
 │   └── secrets.ts                   # AWS Secrets Manager upsert (internalAction)
 └── lib/
     ├── secrets.ts            # AWS Secrets Manager client + helpers
-    └── extractTextContent.ts # AI-powered file text extraction (image/PDF/text)
+    └── extractTextContent.ts # Structure-aware text extraction (PDF/image/CSV/JSON/markdown)
 ```
 
 ### Frontend Apps
@@ -80,6 +84,7 @@ app/
     ├── conversations/   # Conversations list + [conversationId] detail
     ├── customization/   # Widget customization settings
     ├── files/           # Knowledge base management
+    ├── evaluations/     # AI Quality & LLM-as-a-Judge inspection
     ├── integrations/    # Embed snippet installation guide
     ├── plugins/vapi/    # Vapi voice assistant config
     └── billing/         # Plans & billing
@@ -87,6 +92,7 @@ modules/
 ├── dashboard/           # Conversations view, sidebar, panels
 ├── customization/       # Widget settings forms
 ├── files/               # File upload/list components
+├── evaluations/         # AI Quality analytics, inspection modal & human reviews
 ├── integrations/        # Embed code snippets
 ├── plugins/             # Vapi configuration UI
 ├── billing/             # Billing UI

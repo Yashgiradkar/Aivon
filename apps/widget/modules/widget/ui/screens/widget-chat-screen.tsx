@@ -13,7 +13,7 @@ import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar";
 import { cn } from "@workspace/ui/lib/utils";
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
-import { contactSessionIdAtomFamily, conversationIdAtom, hasVapiSecretsAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "../../atoms/widget-atoms";
+import { contactSessionIdAtomFamily, contactSessionTokenAtomFamily, conversationIdAtom, hasVapiSecretsAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "../../atoms/widget-atoms";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 import { Form, FormField } from "@workspace/ui/components/form";
@@ -35,6 +35,7 @@ import { useMemo, useState } from "react";
 import { WidgetQueueBanner } from "../components/widget-queue-banner";
 import { WidgetCallbackDialog } from "../components/widget-callback-dialog";
 import { WidgetCallLogs } from "../components/widget-call-logs";
+import { WidgetSourceAttribution } from "../components/widget-source-attribution";
 import { HeadsetIcon, PhoneForwardedIcon, MessageSquareIcon, AlertCircleIcon } from "lucide-react";
 import { useMutation } from "convex/react";
 
@@ -54,6 +55,9 @@ export const WidgetChatScreen = () => {
   const hasVapiSecrets = useAtomValue(hasVapiSecretsAtom);
   const contactSessionId = useAtomValue(
     contactSessionIdAtomFamily(organizationId || "")
+  );
+  const contactSessionToken = useAtomValue(
+    contactSessionTokenAtomFamily(organizationId || "")
   );
 
   const maxMessages = widgetSettings?.maxMessagesPerConversation ?? 20;
@@ -148,6 +152,7 @@ export const WidgetChatScreen = () => {
         threadId: conversation.threadId,
         prompt: values.message,
         contactSessionId,
+        sessionToken: contactSessionToken || undefined,
       });
     } catch (err: any) {
       console.error("Failed to send message:", err);
@@ -193,10 +198,16 @@ export const WidgetChatScreen = () => {
       </WidgetHeader>
       <WidgetQueueBanner />
       {conversationId && contactSessionId && (
-        <WidgetCallLogs
-          conversationId={conversationId}
-          contactSessionId={contactSessionId}
-        />
+        <>
+          <WidgetCallLogs
+            conversationId={conversationId}
+            contactSessionId={contactSessionId}
+          />
+          <WidgetSourceAttribution
+            conversationId={conversationId}
+            contactSessionId={contactSessionId}
+          />
+        </>
       )}
       <div className="flex items-center justify-between border-b bg-muted/40 px-3 py-1.5 text-[11px] text-muted-foreground">
         <div className="flex items-center gap-1">

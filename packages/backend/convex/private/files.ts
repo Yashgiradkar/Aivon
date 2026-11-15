@@ -1,10 +1,8 @@
-import { ConvexError, v } from "convex/values";
-import { 
+import { ConvexError, v, type Value } from "convex/values";
+import {
   contentHashFromArrayBuffer,
   Entry,
   EntryId,
-  guessMimeTypeFromContents,
-  guessMimeTypeFromExtension,
   vEntryId,
 } from "@convex-dev/rag";
 import { action, mutation, query, QueryCtx } from "../_generated/server";
@@ -13,14 +11,17 @@ import rag from "../system/ai/rag";
 import { Id } from "../_generated/dataModel";
 import { paginationOptsValidator } from "convex/server";
 import { internal } from "../_generated/api";
-
-function guessMimeType(filename: string, bytes: ArrayBuffer): string {
-  return (
-    guessMimeTypeFromExtension(filename) ||
-    guessMimeTypeFromContents(bytes) ||
-    "application/octet-stream"
-  );
-};
+import { TenantBM25Cache } from "../system/ai/rag/bm25";
+import { MultiTenantRetrievalCache, SemanticAnswerKVCache } from "../system/ai/cache";
+import {
+  scanUploadForMalware,
+  validateKnowledgeBaseUpload,
+} from "../lib/uploadSecurity";
+import {
+  IncrementalRAGPipeline,
+  DocumentManifestStore,
+  ChunkEmbeddingCache,
+} from "../system/ai/rag/incremental";
 
 export const deleteFile = mutation({
   args: {
@@ -28,7 +29,7 @@ export const deleteFile = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    
+
     if (identity === null) {
       throw new ConvexError({
         code: "UNAUTHORIZED",
@@ -75,11 +76,28 @@ export const deleteFile = mutation({
     }
 
     if (entry.metadata?.storageId) {
-      await ctx.storage.delete(entry.metadata.storageId as Id<"_storage">)
+      await ctx.storage.delete(entry.metadata.storageId as Id<"_storage">);
     }
 
     await rag.deleteAsync(ctx, {
-      entryId: args.entryId
+      entryId: args.entryId,
+    });
+
+    if (entry.key) {
+      DocumentManifestStore.delete(orgId, entry.key);
+      ChunkEmbeddingCache.pruneStale(
+        orgId,
+        DocumentManifestStore.getActiveChunkHashes(orgId),
+      );
+    }
+
+    // Invalidate BM25 index, in-memory retrieval cache, and semantic answer caches (L1 & L2)
+    // so stale answers are never served after a document is deleted.
+    TenantBM25Cache.invalidate(orgId);
+    MultiTenantRetrievalCache.invalidateOrg(orgId);
+    SemanticAnswerKVCache.invalidateOrg(orgId);
+    await ctx.scheduler.runAfter(0, internal.system.cache.invalidateOrgCache, {
+      organizationId: orgId,
     });
   },
 });
@@ -93,7 +111,7 @@ export const addFile = action({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    
+
     if (identity === null) {
       throw new ConvexError({
         code: "UNAUTHORIZED",
@@ -120,44 +138,150 @@ export const addFile = action({
     if (subscription?.status !== "active") {
       throw new ConvexError({
         code: "BAD_REQUEST",
-        message: "Missing subscription"
+        message: "Missing subscription",
       });
     }
 
-    const { bytes, filename, category } = args;
+    const admission = await ctx.runMutation(
+      internal.system.rateLimits.checkAndAdmit,
+      {
+        organizationId: orgId,
+        estimatedTokens: 4000,
+        isExpensiveOp: true,
+      },
+    );
+    if (!admission.allowed) {
+      throw new ConvexError({
+        code: "RATE_LIMITED",
+        message: "Upload rate limit reached. Please wait and try again.",
+      });
+    }
 
-    const mimeType = args.mimeType || guessMimeType(filename, bytes);
+    if (args.category && args.category.trim().length > 80) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Category exceeds permitted length",
+      });
+    }
+
+    const { bytes, category } = args;
+    // Client MIME types and filenames are untrusted. Validate content and scan
+    // before storage so rejected content can never reach extraction or RAG.
+    const { filename, mimeType } = validateKnowledgeBaseUpload(
+      args.filename,
+      bytes,
+    );
+    await scanUploadForMalware(bytes, filename, mimeType);
     const blob = new Blob([bytes], { type: mimeType });
 
     const storageId = await ctx.storage.store(blob);
 
-    const text = await extractTextContent(ctx, {
-      storageId,
-      filename,
-      bytes,
-      mimeType,
-    });
+    let text: string;
+    let entryId: EntryId;
+    let created: boolean;
+    let replacedEntry: Entry<Record<string, Value>, Record<string, Value>> | null =
+      null;
 
-    const { entryId, created } = await rag.add(ctx, {
-      // SUPER IMPORTANT: What search space to add this to. You cannot search across namespaces,
-      // If not added, it will be considered global (we do not want this)
-      namespace: orgId,
-      text,
-      key: filename,
-      title: filename,
-      metadata: {
-        storageId, // Important for file deletion
-        uploadedBy: orgId, // Important for deletion
+    try {
+      text = await extractTextContent(ctx, {
+        storageId,
         filename,
-        category: category ?? null,
-      } as EntryMetadata,
-      contentHash: await contentHashFromArrayBuffer(bytes) // To avoid re-inserting if the file content hasn't changed
-    });
+        bytes,
+        mimeType,
+      });
+
+      // Incremental processing: Page-aware diffing, structure-aware chunking,
+      // and selective embedding generation. Unchanged chunks have pre-computed
+      // embeddings attached so @convex-dev/rag skips embedMany completely.
+      const incrementalResult = await IncrementalRAGPipeline.processDocument(
+        text,
+        {
+          organizationId: orgId,
+          documentKey: filename,
+          filename,
+          mimeType,
+        },
+      );
+
+      const inputChunks = IncrementalRAGPipeline.toRAGInputChunks(
+        incrementalResult.chunks,
+      );
+
+      const result = await rag.add(ctx as any, {
+        // SUPER IMPORTANT: What search space to add this to. You cannot search across namespaces,
+        // If not added, it will be considered global (we do not want this)
+        namespace: orgId,
+        chunks: inputChunks,
+        key: filename,
+        title: filename,
+        metadata: {
+          storageId, // Important for file deletion
+          uploadedBy: orgId, // Important for deletion
+          filename,
+          category: category ?? null,
+        } as EntryMetadata,
+        contentHash: incrementalResult.documentHash,
+      });
+      entryId = result.entryId;
+      created = result.created;
+      replacedEntry = result.replacedEntry;
+    } catch (err) {
+      // If extraction or indexing fails, clean up the orphaned storage object
+      // so it doesn't leak in Convex file storage.
+      console.error(
+        "[addFile] Extraction/indexing failed; deleting orphaned storage object:",
+        err,
+      );
+      try {
+        await ctx.storage.delete(storageId);
+      } catch (cleanupErr) {
+        console.error(
+          "[addFile] Failed to clean up orphaned storage:",
+          cleanupErr,
+        );
+      }
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Failed to process file. Please try again or contact support.",
+      });
+    }
 
     if (!created) {
+      // Duplicate detected via contentHash — the new storage blob is redundant.
+      // Delete it and return the existing entry without a URL (storage was removed).
       console.debug("entry already exists, skipping upload metadata");
       await ctx.storage.delete(storageId);
+      return {
+        url: null,
+        entryId,
+      };
     }
+
+    // If an existing version was replaced, clean up its prior storage blob
+    if (
+      replacedEntry?.metadata?.storageId &&
+      replacedEntry.metadata.storageId !== storageId
+    ) {
+      try {
+        await ctx.storage.delete(
+          replacedEntry.metadata.storageId as Id<"_storage">,
+        );
+      } catch (cleanupErr) {
+        console.warn(
+          "[addFile] Failed to clean up previous storage blob:",
+          cleanupErr,
+        );
+      }
+    }
+
+    // Invalidate BM25 index, in-memory retrieval cache, and semantic answer caches (L1 & L2)
+    // so the new document is immediately available and stale answers are purged.
+    TenantBM25Cache.invalidate(orgId);
+    MultiTenantRetrievalCache.invalidateOrg(orgId);
+    SemanticAnswerKVCache.invalidateOrg(orgId);
+    await ctx.runMutation(internal.system.cache.invalidateOrgCache, {
+      organizationId: orgId,
+    });
 
     return {
       url: await ctx.storage.getUrl(storageId),
@@ -173,7 +297,7 @@ export const list = query({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    
+
     if (identity === null) {
       throw new ConvexError({
         code: "UNAUTHORIZED",
@@ -204,7 +328,9 @@ export const list = query({
     });
 
     const files = await Promise.all(
-      results.page.map((entry) => convertEntryToPublicFile(ctx, entry))
+      results.page
+        .filter((entry) => entry.metadata?.uploadedBy === orgId)
+        .map((entry) => convertEntryToPublicFile(ctx, entry)),
     );
 
     const filteredFiles = args.category
@@ -220,7 +346,7 @@ export const list = query({
 });
 
 export type PublicFile = {
-  id: EntryId,
+  id: EntryId;
   name: string;
   type: string;
   size: string;
@@ -261,9 +387,9 @@ async function convertEntryToPublicFile(
 
   let status: "ready" | "processing" | "error" = "error";
   if (entry.status === "ready") {
-    status = "ready"
+    status = "ready";
   } else if (entry.status === "pending") {
-    status = "processing"
+    status = "processing";
   }
 
   const url = storageId ? await ctx.storage.getUrl(storageId) : null;
@@ -277,7 +403,7 @@ async function convertEntryToPublicFile(
     url,
     category: metadata?.category || undefined,
   };
-};
+}
 
 function formatFileSize(bytes: number): string {
   if (bytes === 0) {
@@ -289,4 +415,4 @@ function formatFileSize(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
 
   return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
-};
+}

@@ -238,6 +238,7 @@ export const WidgetVoiceScreen = () => {
     transcript,
     liveTranscript,
     errorMessage,
+    activeLanguage,
     startCall,
     endCall,
     toggleMute,
@@ -289,6 +290,12 @@ export const WidgetVoiceScreen = () => {
                 ? "Voice Support"
                 : "Voice Chat"}
             </p>
+            {/* Language badge — shown during active call */}
+            {(callState === "listening" || callState === "speaking" || callState === "muted") && (
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                {activeLanguage}
+              </span>
+            )}
           </div>
           {/* Switch to text chat */}
           {conversationId && (

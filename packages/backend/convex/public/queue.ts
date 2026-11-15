@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
-import { action, mutation, query } from "../_generated/server";
+import { mutation, query } from "../_generated/server";
 import { internal } from "../_generated/api";
+import { isE164PhoneNumber, MAX_CALLBACK_SCHEDULE_MS } from "../lib/requestSecurity";
 
 const AVG_CALL_DURATION_SECONDS = 180;
 
@@ -10,19 +11,32 @@ const AVG_CALL_DURATION_SECONDS = 180;
 export const getAvailability = query({
   args: {
     organizationId: v.string(),
+    contactSessionId: v.id("contactSessions"),
   },
   handler: async (ctx, args) => {
+    const contactSession = await ctx.db.get(args.contactSessionId);
+    if (
+      !contactSession ||
+      contactSession.expiresAt < Date.now() ||
+      contactSession.organizationId !== args.organizationId
+    ) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Invalid session",
+      });
+    }
+
     const availableAgents = await ctx.db
       .query("supportAgentAvailability")
       .withIndex("by_organization_id_and_status", (q) =>
-        q.eq("organizationId", args.organizationId).eq("status", "available")
+        q.eq("organizationId", args.organizationId).eq("status", "available"),
       )
       .collect();
 
     const waitingEntries = await ctx.db
       .query("supportQueue")
       .withIndex("by_organization_id_and_status", (q) =>
-        q.eq("organizationId", args.organizationId).eq("status", "waiting")
+        q.eq("organizationId", args.organizationId).eq("status", "waiting"),
       )
       .collect();
 
@@ -33,7 +47,7 @@ export const getAvailability = query({
         ? 0
         : Math.ceil(
             ((queueLength + 1) * AVG_CALL_DURATION_SECONDS) /
-              Math.max(activeAgentCount, 1)
+              Math.max(activeAgentCount, 1),
           );
 
     return {
@@ -52,9 +66,6 @@ export const join = mutation({
   args: {
     conversationId: v.id("conversations"),
     contactSessionId: v.id("contactSessions"),
-    priority: v.optional(
-      v.union(v.literal("normal"), v.literal("high"), v.literal("urgent"))
-    ),
   },
   handler: async (ctx, args) => {
     const contactSession = await ctx.db.get(args.contactSessionId);
@@ -72,12 +83,21 @@ export const join = mutation({
         message: "Conversation not found",
       });
     }
+    if (
+      conversation.contactSessionId !== contactSession._id ||
+      conversation.organizationId !== contactSession.organizationId
+    ) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Incorrect session",
+      });
+    }
 
     // Check if an active queue entry already exists for this conversation
     const existing = await ctx.db
       .query("supportQueue")
       .withIndex("by_conversation_id", (q) =>
-        q.eq("conversationId", args.conversationId)
+        q.eq("conversationId", args.conversationId),
       )
       .filter((q) =>
         q.or(
@@ -85,8 +105,8 @@ export const join = mutation({
           q.eq(q.field("status"), "offered"),
           q.eq(q.field("status"), "accepted"),
           q.eq(q.field("status"), "connecting"),
-          q.eq(q.field("status"), "connected")
-        )
+          q.eq(q.field("status"), "connected"),
+        ),
       )
       .first();
 
@@ -103,7 +123,9 @@ export const join = mutation({
     const waitingEntries = await ctx.db
       .query("supportQueue")
       .withIndex("by_organization_id_and_status", (q) =>
-        q.eq("organizationId", conversation.organizationId).eq("status", "waiting")
+        q
+          .eq("organizationId", conversation.organizationId)
+          .eq("status", "waiting"),
       )
       .collect();
 
@@ -117,7 +139,7 @@ export const join = mutation({
       customerName: contactSession.name,
       customerEmail: contactSession.email,
       status: "waiting",
-      priority: args.priority || "normal",
+      priority: "normal",
       position,
       joinedAt: Date.now(),
       estimatedWaitSeconds,
@@ -154,16 +176,20 @@ export const getQueueStatus = query({
       return null;
     }
 
+    const conversation = await ctx.db.get(args.conversationId);
+    if (!conversation || conversation.contactSessionId !== contactSession._id)
+      return null;
+
     const queueEntry = await ctx.db
       .query("supportQueue")
       .withIndex("by_conversation_id", (q) =>
-        q.eq("conversationId", args.conversationId)
+        q.eq("conversationId", args.conversationId),
       )
       .filter((q) =>
         q.and(
           q.neq(q.field("status"), "cancelled"),
-          q.neq(q.field("status"), "expired")
-        )
+          q.neq(q.field("status"), "expired"),
+        ),
       )
       .order("desc")
       .first();
@@ -172,7 +198,14 @@ export const getQueueStatus = query({
       return null;
     }
 
-    return queueEntry;
+    return {
+      _id: queueEntry._id,
+      status: queueEntry.status,
+      position: queueEntry.position,
+      estimatedWaitSeconds: queueEntry.estimatedWaitSeconds,
+      assignedAgentName: queueEntry.assignedAgentName,
+      isCallback: queueEntry.isCallback,
+    };
   },
 });
 
@@ -185,8 +218,14 @@ export const leave = mutation({
     contactSessionId: v.id("contactSessions"),
   },
   handler: async (ctx, args) => {
+    const contactSession = await ctx.db.get(args.contactSessionId);
     const queueEntry = await ctx.db.get(args.queueEntryId);
-    if (!queueEntry || queueEntry.contactSessionId !== args.contactSessionId) {
+    if (
+      !contactSession ||
+      contactSession.expiresAt < Date.now() ||
+      !queueEntry ||
+      queueEntry.contactSessionId !== contactSession._id
+    ) {
       throw new ConvexError({
         code: "UNAUTHORIZED",
         message: "Invalid queue entry",
@@ -201,10 +240,12 @@ export const leave = mutation({
     if (queueEntry.assignedAgentId) {
       const agentRecord = await ctx.db
         .query("supportAgentAvailability")
-        .withIndex("by_agent_id", (q) =>
-          q.eq("agentId", queueEntry.assignedAgentId!)
+          .withIndex("by_organization_id_and_agent_id", (q) =>
+            q
+              .eq("organizationId", queueEntry.organizationId)
+              .eq("agentId", queueEntry.assignedAgentId!),
         )
-        .first();
+          .unique();
 
       if (agentRecord) {
         await ctx.db.patch(agentRecord._id, {
@@ -221,7 +262,7 @@ export const leave = mutation({
       internal.system.queue.recalculatePositions,
       {
         organizationId: queueEntry.organizationId,
-      }
+      },
     );
   },
 });
@@ -252,6 +293,35 @@ export const scheduleCallback = mutation({
         message: "Conversation not found",
       });
     }
+    if (
+      conversation.contactSessionId !== contactSession._id ||
+      conversation.organizationId !== contactSession.organizationId
+    ) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Incorrect session",
+      });
+    }
+
+    const callbackPhoneNumber = args.callbackPhoneNumber.trim();
+    if (!isE164PhoneNumber(callbackPhoneNumber)) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "A valid E.164 callback number is required",
+      });
+    }
+
+    const scheduledFor = args.scheduledFor || Date.now();
+    if (
+      !Number.isFinite(scheduledFor) ||
+      scheduledFor < Date.now() - 60_000 ||
+      scheduledFor > Date.now() + MAX_CALLBACK_SCHEDULE_MS
+    ) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Callback time must be within the next 7 days",
+      });
+    }
 
     const queueEntryId = await ctx.db.insert("supportQueue", {
       organizationId: conversation.organizationId,
@@ -266,8 +336,8 @@ export const scheduleCallback = mutation({
       estimatedWaitSeconds: 0,
       lastSeenAt: Date.now(),
       isCallback: true,
-      scheduledFor: args.scheduledFor || Date.now(),
-      callbackPhoneNumber: args.callbackPhoneNumber,
+      scheduledFor,
+      callbackPhoneNumber,
     });
 
     await ctx.scheduler.runAfter(0, internal.system.queue.generateSummary, {
@@ -288,8 +358,14 @@ export const heartbeat = mutation({
     contactSessionId: v.id("contactSessions"),
   },
   handler: async (ctx, args) => {
+    const contactSession = await ctx.db.get(args.contactSessionId);
     const queueEntry = await ctx.db.get(args.queueEntryId);
-    if (queueEntry && queueEntry.contactSessionId === args.contactSessionId) {
+    if (
+      contactSession &&
+      contactSession.expiresAt >= Date.now() &&
+      queueEntry &&
+      queueEntry.contactSessionId === contactSession._id
+    ) {
       await ctx.db.patch(args.queueEntryId, {
         lastSeenAt: Date.now(),
       });
@@ -308,56 +384,16 @@ export const updateCallStatus = mutation({
       v.literal("connecting"),
       v.literal("connected"),
       v.literal("completed"),
-      v.literal("failed")
+      v.literal("failed"),
     ),
   },
-  handler: async (ctx, args) => {
-    const queueEntry = await ctx.db.get(args.queueEntryId);
-    if (!queueEntry || queueEntry.contactSessionId !== args.contactSessionId) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Invalid session",
-      });
-    }
-
-    const patch: Record<string, unknown> = {
-      status: args.status,
-    };
-
-    if (args.status === "connected") {
-      patch.connectedAt = Date.now();
-    } else if (args.status === "completed" || args.status === "failed") {
-      patch.completedAt = Date.now();
-
-      // Release agent
-      if (queueEntry.assignedAgentId) {
-        const agent = await ctx.db
-          .query("supportAgentAvailability")
-          .withIndex("by_agent_id", (q) =>
-            q.eq("agentId", queueEntry.assignedAgentId!)
-          )
-          .first();
-
-        if (agent) {
-          await ctx.db.patch(agent._id, {
-            status: "available",
-            currentConversationId: undefined,
-            currentQueueEntryId: undefined,
-          });
-
-          // Match next customer
-          await ctx.scheduler.runAfter(
-            0,
-            internal.system.queue.matchAndAssign,
-            {
-              organizationId: queueEntry.organizationId,
-            }
-          );
-        }
-      }
-    }
-
-    await ctx.db.patch(args.queueEntryId, patch);
+  handler: async () => {
+    // Queue/call state changes affect agent availability and must originate
+    // from trusted server-side call processing, never an end-user browser.
+    throw new ConvexError({
+      code: "UNAUTHORIZED",
+      message: "Call status is managed by the server",
+    });
   },
 });
 
@@ -375,10 +411,19 @@ export const getCallLogs = query({
       return [];
     }
 
+    const conversation = await ctx.db.get(args.conversationId);
+    if (
+      !conversation ||
+      conversation.contactSessionId !== contactSession._id ||
+      conversation.organizationId !== contactSession.organizationId
+    ) {
+      return [];
+    }
+
     const calls = await ctx.db
       .query("supportCalls")
       .withIndex("by_conversation_id", (q) =>
-        q.eq("conversationId", args.conversationId)
+        q.eq("conversationId", args.conversationId),
       )
       .order("desc")
       .collect();

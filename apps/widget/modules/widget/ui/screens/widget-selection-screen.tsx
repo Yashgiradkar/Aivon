@@ -26,7 +26,9 @@ export const WidgetSelectionScreen = () => {
   const joinQueue = useMutation(api.public.queue.join);
   const availability = useQuery(
     api.public.queue.getAvailability,
-    organizationId ? { organizationId } : "skip"
+    organizationId && contactSessionId
+      ? { organizationId, contactSessionId }
+      : "skip"
   );
 
   const [isPending, setIsPending] = useState(false);

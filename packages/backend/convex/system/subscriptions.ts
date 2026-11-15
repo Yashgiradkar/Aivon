@@ -1,5 +1,9 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
+import {
+  isAllowedSubscriptionStatus,
+  isSafeOrganizationId,
+} from "../lib/requestSecurity";
 
 export const upsert = internalMutation({
   args: {
@@ -7,6 +11,16 @@ export const upsert = internalMutation({
     status: v.string(),
   },
   handler: async (ctx, args) => {
+    if (
+      !isSafeOrganizationId(args.organizationId) ||
+      !isAllowedSubscriptionStatus(args.status)
+    ) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Subscription update is invalid",
+      });
+    }
+
     const existingSubscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_organization_id", (q) => 

@@ -108,7 +108,8 @@ The root `pnpm dev` runs all apps in parallel via Turborepo.
 | URL | App |
 |-----|-----|
 | http://localhost:3000 | Operator dashboard (requires Clerk login + org) |
-| http://localhost:3001?organizationId=<orgId> | Widget (requires a valid org ID) |
+| http://localhost:3000/travel | Voice-first travel agent (public, no auth) |
+| http://localhost:3001?organizationId=`<orgId>` | Widget (requires a valid org ID) |
 | http://localhost:3002 | Embed script dev/demo page |
 
 ---
@@ -157,6 +158,43 @@ cd apps/widget && pnpm typecheck
 
 ---
 
+## Testing
+
+### Travel Agent Tests (normalizer + workflow)
+
+```bash
+# From repo root — runs both test files in sequence
+pnpm test:travel
+
+# Output:
+# eval/tests/travelNormalizer.test.ts  — 7 test suites (slot extraction, location resolution,
+#   relative date parsing, time windows, transport mode, confirmation intent, speech corrections)
+# eval/tests/travelWorkflow.test.ts    — 5-turn canonical journey + 3 guardrail suites
+#   (unconfirmed booking rejection, idempotency, cancellation & reset)
+```
+
+Tests run via `tsx` (no build step required). Both files exit with code 0 on full pass.
+
+### Security Guardrail Tests
+
+```bash
+# Run security guardrail tests directly
+npx tsx eval/tests/securityAndGuardrails.test.ts
+```
+
+### Type Checking
+
+```bash
+# Type-check individual apps
+cd apps/web && pnpm typecheck
+cd apps/widget && pnpm typecheck
+
+# Type-check backend Convex functions
+cd packages/backend && npx tsc --noEmit
+```
+
+---
+
 ## Code Organization
 
 The monorepo is organized as a pnpm workspace + Turborepo:
@@ -164,12 +202,16 @@ The monorepo is organized as a pnpm workspace + Turborepo:
 ```
 /
 ├── apps/
-│   ├── web/              # Operator dashboard
-│   │   ├── app/          # Next.js App Router routes
+│   ├── web/              # Operator dashboard + /travel voice agent
+│   │   ├── app/
+│   │   │   ├── (auth)/       # Clerk sign-in/sign-up
+│   │   │   ├── (dashboard)/  # Protected routes (conversations, files, evaluations …)
+│   │   │   └── (travel)/     # Public voice-first travel agent (/travel)
 │   │   ├── components/   # App-level shared components (providers, etc.)
 │   │   ├── hooks/        # App-level hooks
 │   │   ├── lib/          # App-level utilities
-│   │   └── modules/      # Feature modules (domain-organized)
+│   │   ├── modules/      # Feature modules (domain-organized)
+│   │   └── middleware.ts # Clerk auth + public route allowlist (/travel)
 │   ├── widget/           # End-user chat widget
 │   │   ├── app/          # Next.js App Router (single page)
 │   │   ├── components/   # Widget-level components
@@ -178,12 +220,28 @@ The monorepo is organized as a pnpm workspace + Turborepo:
 │   └── embed/            # Embeddable script (Vite + IIFE)
 ├── packages/
 │   ├── backend/          # Convex backend
-│   │   └── convex/       # All Convex functions and schema
+│   │   └── convex/
+│   │       ├── public/       # Widget-facing functions
+│   │       ├── private/      # Dashboard-facing functions
+│   │       ├── system/ai/
+│   │       │   ├── agents/         # supportAgent
+│   │       │   ├── tools/          # search, escalate, resolve tools
+│   │       │   ├── orchestration/  # router, planner, registry, executor
+│   │       │   ├── travel/         # normalizer, workflow, provider, capability
+│   │       │   ├── rag/            # bm25, fusion, queryRouter, corpus
+│   │       │   ├── security/       # sanitizer, rateLimiter, guardrails
+│   │       │   └── evaluation/     # LLM-as-a-Judge rubric & actions
+│   │       └── schema.ts       # Single source of truth for all tables
 │   ├── ui/               # Shared component library
 │   ├── eslint-config/    # Shared ESLint config
 │   ├── typescript-config/# Shared tsconfig
 │   └── math/             # (placeholder/utility package)
-├── package.json          # Root scripts + packageManager
+├── eval/                 # Standalone test suites (tsx-executed)
+│   └── tests/
+│       ├── travelNormalizer.test.ts
+│       ├── travelWorkflow.test.ts
+│       └── securityAndGuardrails.test.ts
+├── package.json          # Root scripts + packageManager (includes test:travel)
 ├── pnpm-workspace.yaml   # Workspace package paths
 └── turbo.json            # Turborepo pipeline config
 ```
@@ -221,7 +279,41 @@ modules/<feature>/
 
 ## Branch / PR Expectations
 
-No CI/CD configuration files were found in the repository. Branch and PR conventions are not codified in the codebase.
+GitHub Actions CI (`.github/workflows/ci.yml`) runs on push and pull requests to `main` and `feature/*` branches:
+- Dependency validation using `pnpm install --frozen-lockfile`
+- Security vulnerability auditing using `pnpm audit`
+- TypeScript type-checking across apps and Convex backend
+- Monorepo test suite execution (`pnpm test` running 23 test suites)
+
+---
+
+## Testing & Quality Assurance
+
+Aivon provides 23 automated, standalone test suites executed via `pnpm test` (using `tsx` with `node:assert/strict`):
+
+```bash
+# Run all 23 test suites
+pnpm test
+
+# Run security and guardrail tests
+pnpm test:security
+
+# Run travel agent normalizer and workflow tests
+pnpm test:travel
+```
+
+Key test suites include:
+- `eval/tests/securityAndGuardrails.test.ts` — Prompt injection, PII redaction, output safety
+- `eval/tests/securityHardening.test.ts` — Authentication bounds, CSP, and permission controls
+- `eval/tests/uploadAndIngestionSecurity.test.ts` — MIME spoofing, magic bytes, EICAR antivirus, decompression bombs
+- `eval/tests/owaspSecurityAudit.test.ts` — OWASP GenAI Top 10, ASVS, and agent authorization
+- `eval/tests/auditTrailAndDataLineage.test.ts` — Correlated trace IDs, RAG chunk attribution, voice lineage
+- `eval/tests/applicationLimits.test.ts` — Operational boundaries, text limits, rate limit windows, upload budgets
+- `eval/tests/incrementalRagPipeline.test.ts` — SHA-256 content hashing, structure chunking, cache preservation
+- `eval/tests/rateLimiting.test.ts` — Tiered token quotas, concurrency admission, quota rollover
+- `eval/tests/voiceAndElevenLabs.test.ts` — Speech formatting, ElevenLabs parameters, multilingual voice synthesis
+- `eval/tests/queueWorkflow.test.ts` — FIFO priority matching, presence tracking, atomic reservation
+- `eval/tests/travelNormalizer.test.ts` & `travelWorkflow.test.ts` — Voice slot extraction and booking state machines
 
 ---
 
@@ -264,3 +356,28 @@ No CI/CD configuration files were found in the repository. Branch and PR convent
 4. Make changes to frontend — hot module replacement handles it.
 5. Schema changes: edit `convex/schema.ts`, Convex applies them automatically.
 6. Type check before committing: `pnpm typecheck` in relevant apps.
+7. Run travel agent tests: `pnpm test:travel` — must pass before merging travel-related changes.
+
+---
+
+## Troubleshooting (Extended)
+
+### Travel agent voice not working
+- Ensure browser supports Web Speech API (Chrome/Edge recommended; Firefox limited)
+- Check that `/travel` is in the public route allowlist in `apps/web/middleware.ts`
+- Verify `public/travel.ts` Convex functions are deployed (`pnpm dev` in `packages/backend`)
+
+### Hybrid RAG returning poor results
+- Verify BM25 corpus cache is populated: file uploads trigger `TenantBM25Cache.invalidate(orgId)`, followed by automatic rebuild on next query
+- For exact-code queries (e.g. `WC-104`), router should classify as `"bm25"` — check `queryRouter.ts` patterns
+- Dense search failing: verify `OPENAI_API_KEY` is valid (degraded-mode falls back to BM25 automatically)
+
+### Orchestration not routing to travel capability
+- Verify `TRAVEL_REGEX` in `orchestration/router.ts` covers the query terms
+- Confirm `TravelAgentCapability` is registered in `CapabilityRegistry`
+- Check `RoutingCategory` type includes `"travel_inquiry"` in `orchestration/types.ts`
+
+### Travel booking failing / not confirming
+- Booking requires explicit `confirmedByCustomer: true` in `initiateBooking` — the workflow must be in `AWAITING_CONFIRMATION` state and user must confirm
+- If state is stuck: check session state in `travelSessions` Convex table
+- Duplicate booking attempts with same idempotency key return the original PNR (safe to retry)

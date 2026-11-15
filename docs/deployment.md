@@ -22,6 +22,7 @@ The Convex deployment slug from `packages/backend/.env.local` (`CONVEX_DEPLOYMEN
 - **Platform**: Vercel (inferred from Sentry config: `sentry.io` org `aivon-2t`, project `aivon-errors`)
 - **Framework**: Next.js 15 with Sentry instrumentation
 - **Build command**: `next build` (or `pnpm build` from root via Turbo)
+- **Notable routes**: `/travel` is a publicly accessible route (no Clerk auth); allowed via `middleware.ts` public route list
 
 ### `apps/widget` — Chat Widget
 
@@ -131,6 +132,8 @@ Convex applies schema changes automatically on `convex dev` or `convex deploy`. 
 2. Deploy the updated functions
 3. Remove the field from `schema.ts` and deploy again
 
+> **Note on `travelSessions` and `travelBookings`**: These tables were added additively. Convex auto-applied them on the next `convex dev` run. They use random session tokens (not orgId) so they are safe to add without backfill.
+
 ---
 
 ## Clerk Configuration (Required for Production)
@@ -217,3 +220,16 @@ The Sentry tunnel route `/monitoring` in `apps/web/next.config.mjs` proxies brow
 1. Check if org has Vapi plugin connected (dashboard → Voice Assistant)
 2. Verify Vapi credentials in AWS Secrets Manager
 3. Check browser has microphone permissions (iframe requires `allow="microphone"`)
+
+### Hybrid RAG not returning results
+1. Check that knowledge base files are uploaded (Files dashboard)
+2. Verify `OPENAI_API_KEY` is valid — dense vector embedding requires OpenAI; if it fails, BM25 fallback activates automatically
+3. For exact codes/identifiers (`WC-104`, `SKU-007`), queries route to pure BM25 — ensure `queryRouter.ts` patterns match
+4. Check Convex dashboard for failed actions in `private.files.addFile` (BM25 cache is invalidated on each upload)
+
+### Voice travel agent not responding
+1. Verify `/travel` is in the public route allowlist in `apps/web/middleware.ts`
+2. Confirm `public/travel.ts` Convex functions are deployed (check Convex dashboard)
+3. Ensure `travelSessions` and `travelBookings` tables exist in the Convex deployment
+4. Browser must support Web Speech API (Chrome/Edge; Firefox has limited support)
+5. Booking attempts without explicit user confirmation return `success: false` — this is correct behavior, not a bug

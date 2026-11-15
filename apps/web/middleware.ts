@@ -5,6 +5,7 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/auth/demo(.*)",
+  "/travel(.*)",
 ]);
 
 const isOrgFreeRoute = createRouteMatcher([
@@ -12,6 +13,7 @@ const isOrgFreeRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/org-selection(.*)",
   "/api/auth/demo(.*)",
+  "/travel(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
@@ -22,7 +24,9 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   if (userId && !orgId && !isOrgFreeRoute(req)) {
-    const searchParams = new URLSearchParams({ redirectUrl: req.url });
+    const searchParams = new URLSearchParams({
+      redirectUrl: req.nextUrl.pathname,
+    });
 
     const orgSelection = new URL(
       `/org-selection?${searchParams.toString()}`,

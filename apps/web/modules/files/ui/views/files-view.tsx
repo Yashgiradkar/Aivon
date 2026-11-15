@@ -22,9 +22,19 @@ import { api } from "@workspace/backend/_generated/api";
 import type { PublicFile } from "@workspace/backend/private/files";
 import { Button } from "@workspace/ui/components/button";
 import { FileIcon, MoreHorizontalIcon, PlusIcon, TrashIcon } from "lucide-react";
-import { UploadDialog } from "../components/upload-dialog";
+import dynamic from "next/dynamic";
 import { useState } from "react";
-import { DeleteFileDialog } from "../components/delete-file-dialog";
+import { Skeleton } from "@workspace/ui/components/skeleton";
+
+const UploadDialog = dynamic(
+  () => import("../components/upload-dialog").then((mod) => mod.UploadDialog),
+  { ssr: false }
+);
+
+const DeleteFileDialog = dynamic(
+  () => import("../components/delete-file-dialog").then((mod) => mod.DeleteFileDialog),
+  { ssr: false }
+);
 
 export const FilesView = () => {
   const files = usePaginatedQuery(
@@ -104,13 +114,25 @@ export const FilesView = () => {
               <TableBody>
                 {(() => {
                   if (isLoadingFirstPage) {
-                    return (
-                      <TableRow>
-                        <TableCell className="h-24 text-center" colSpan={4}>
-                          Loading files...
+                    return Array.from({ length: 4 }).map((_, i) => (
+                      <TableRow key={i} className="hover:bg-transparent">
+                        <TableCell className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <Skeleton className="size-4 rounded-sm" />
+                            <Skeleton className="h-4 w-48" />
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-6 py-4">
+                          <Skeleton className="h-5 w-14 rounded-full" />
+                        </TableCell>
+                        <TableCell className="px-6 py-4">
+                          <Skeleton className="h-4 w-16" />
+                        </TableCell>
+                        <TableCell className="px-6 py-4">
+                          <Skeleton className="size-8 rounded-md ml-auto" />
                         </TableCell>
                       </TableRow>
-                    );
+                    ));
                   }
 
                   if (files.results.length === 0) {

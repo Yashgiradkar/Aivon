@@ -9,11 +9,26 @@ export const organizationIdAtom = atom<string | null>(null);
 export const contactSessionIdAtomFamily = atomFamily((organizationId: string) => {
   return atomWithStorage<Id<"contactSessions"> | null>(`${CONTACT_SESSION_KEY}_${organizationId}`, null)
 });
+export const contactSessionTokenAtomFamily = atomFamily((organizationId: string) => {
+  return atomWithStorage<string | null>(`${CONTACT_SESSION_KEY}_token_${organizationId}`, null)
+});
 export const errorMessageAtom = atom<string | null>(null);
 export const loadingMessageAtom = atom<string | null>(null);
 export const conversationIdAtom = atom<Id<"conversations"> | null>(null);
 
-export const widgetSettingsAtom = atom<Doc<"widgetSettings"> | null>(null);
+export const widgetSettingsAtom = atom<{
+  greetMessage: string;
+  maxMessagesPerConversation?: number;
+  defaultSuggestions: {
+    suggestion1?: string;
+    suggestion2?: string;
+    suggestion3?: string;
+  };
+  vapiSettings: {
+    assistantId?: string;
+    phoneNumber?: string;
+  };
+} | null>(null);
 export const vapiSecretsAtom = atom<{
   publicApiKey: string;
 } | null>(null);

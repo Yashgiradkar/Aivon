@@ -1,5 +1,85 @@
 # Production AI System Changelog
 
+## Phase N — Voice-First AI Travel Agent & Multi-Turn Orchestration
+
+### Date
+2026-10-26
+
+### Objective
+Implement a production-ready, voice-first AI travel agent with multi-turn state machine, deterministic slot extraction, consequential action guardrails, idempotency protection, and 100%-passing test coverage.
+
+### What Changed
+
+**Backend — Convex Schema**
+- Added `travelSessions` table (`sessionToken`, `state`, `slots`, `expiresAt`) with `by_session_token` index.
+- Added `travelBookings` table (`idempotencyToken`, `bookingReference`, `status`) with `by_session_token`, `by_idempotency_token`, `by_booking_reference` indexes.
+
+**Domain Contracts (`system/ai/travel/types.ts`)**
+- `TransportMode`, `TravelWorkflowState`, `TravelSlots`, `TravelOption`, `TravelProviderInterface`, `TravelTurnResult` type definitions.
+
+**Slot Normalizer (`system/ai/travel/normalizer.ts`)**
+- `TravelNormalizer` class: `resolveLocation`, `normalizeDate`, `extractTimeWindow`, `extractTransportMode`, `extractOptionSelection`, `detectConfirmationIntent`, `extractOriginAndDestination`, `extractAndMergeSlots`.
+- Fixed: relative date `"day after tomorrow"` was matching `"tomorrow"` prefix — corrected by checking the longer form first.
+- Fixed: speech correction regex was capturing the word `"sorry"` as the corrected city; replaced with two focused patterns (dash-based `—sorry,` and spoken keyword).
+
+**Travel Provider (`system/ai/travel/provider.ts`)**
+- `DeterministicMockTravelProvider` with Indian train (Vande Bharat, Duronto), flight (IndiGo, Air India), and bus schedules.
+- `initiateBooking` strictly requires `confirmedByCustomer === true`; idempotency via in-memory map.
+
+**Workflow State Machine (`system/ai/travel/workflow.ts`)**
+- `TravelWorkflowManager.processTurn` drives: `GREETING → COLLECTING_REQUIREMENTS → CLARIFYING → SEARCHING → PRESENTING_OPTIONS → AWAITING_SELECTION → AWAITING_CONFIRMATION → BOOKED`.
+- Slot accumulation across turns; departure window extracted from "morning" in date utterance.
+- Cancellation (`"No, cancel this"`) reverts to `AWAITING_SELECTION`; reset (`"start over"`) clears all slots.
+
+**Orchestration Integration**
+- `travel_inquiry` added to `RoutingCategory` union (`orchestration/types.ts`).
+- `TRAVEL_REGEX` added to `ConversationRouter` (`orchestration/router.ts`).
+- `travel_inquiry` execution plan added to `OrchestrationPlanner` (`orchestration/planner.ts`).
+- `TravelAgentCapability` registered in `CapabilityRegistry` (`orchestration/registry.ts`).
+
+**Public Convex API (`public/travel.ts`)**
+- `createSession`, `processTurn` (action), `getSession`, `getBookings`, `cancelSession`.
+
+**Voice-First Frontend (`apps/web/app/(travel)/travel/page.tsx`)**
+- Web Speech API `SpeechRecognition` voice input; `speechSynthesis` output.
+- Animated voice orb with listening/speaking/idle states.
+- Barge-in support; real-time transcript log; explicit confirmation UI with booking summary card.
+
+**Middleware**
+- `/travel(.*)` added to public route allowlist in `apps/web/middleware.ts` (no Clerk auth required).
+
+**Root Package**
+- `"test:travel": "tsx eval/tests/travelNormalizer.test.ts && tsx eval/tests/travelWorkflow.test.ts"` added to `package.json`.
+
+### Test Files
+- `eval/tests/travelNormalizer.test.ts` — 7 test suites covering location resolution, date normalization, time window parsing, transport mode detection, option selection, confirmation detection, speech corrections.
+- `eval/tests/travelWorkflow.test.ts` — 5-turn canonical journey, unconfirmed booking rejection, idempotency protection, cancellation & reset.
+
+### Validation
+- `pnpm test:travel` — **100% pass (all 7 normalizer suites + all 4 workflow suites)**.
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `packages/backend/convex/schema.ts` | Added `travelSessions`, `travelBookings` |
+| `packages/backend/convex/system/ai/travel/types.ts` | **Created** |
+| `packages/backend/convex/system/ai/travel/normalizer.ts` | **Created** (+ 2 bug fixes) |
+| `packages/backend/convex/system/ai/travel/provider.ts` | **Created** |
+| `packages/backend/convex/system/ai/travel/workflow.ts` | **Created** |
+| `packages/backend/convex/system/ai/travel/capability.ts` | **Created** |
+| `packages/backend/convex/system/ai/orchestration/types.ts` | Added `travel_inquiry` |
+| `packages/backend/convex/system/ai/orchestration/router.ts` | Added `TRAVEL_REGEX` |
+| `packages/backend/convex/system/ai/orchestration/planner.ts` | Added travel plan |
+| `packages/backend/convex/system/ai/orchestration/registry.ts` | Registered `TravelAgentCapability` |
+| `packages/backend/convex/public/travel.ts` | **Created** |
+| `apps/web/app/(travel)/travel/page.tsx` | **Created** |
+| `apps/web/middleware.ts` | Added `/travel` public route |
+| `package.json` | Added `test:travel` script |
+| `eval/tests/travelNormalizer.test.ts` | **Created** (+ test alignment fixes) |
+| `eval/tests/travelWorkflow.test.ts` | **Created** (+ assertion fixes) |
+
+---
+
 ## Phase 0 — Architecture & Baseline Audit
 
 ### Date

@@ -1,6 +1,18 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation } from "../_generated/server";
+import { Id } from "../_generated/dataModel";
 import { SESSION_DURATION_MS } from "../constants";
+import {
+  CONTACT_SESSION_CREATE_MAX,
+  CONTACT_SESSION_CREATE_WINDOW_MS,
+  countEventsInWindow,
+  isSafeOrganizationId,
+  isValidEmail,
+} from "../lib/requestSecurity";
+import {
+  createSignedSessionToken,
+  verifySignedSessionToken,
+} from "../lib/sessionToken";
 
 export const create = mutation({
   args: {
@@ -21,17 +33,59 @@ export const create = mutation({
         cookieEnabled: v.optional(v.boolean()),
         referrer: v.optional(v.string()),
         currentUrl: v.optional(v.string()),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
+    const name = args.name.trim();
+    const email = args.email.trim().toLowerCase();
+    const organizationId = args.organizationId.trim();
+    if (
+      !name ||
+      name.length > 120 ||
+      !isValidEmail(email) ||
+      !isSafeOrganizationId(organizationId)
+    ) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Invalid contact session details",
+      });
+    }
+
+    if (!metadataIsBounded(args.metadata)) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Contact metadata exceeds permitted limits",
+      });
+    }
+
     const now = Date.now();
+    const recentSessions = await ctx.db
+      .query("contactSessions")
+      .withIndex("by_organization_id_and_email", (q) =>
+        q.eq("organizationId", organizationId).eq("email", email),
+      )
+      .order("desc")
+      .take(CONTACT_SESSION_CREATE_MAX);
+    if (
+      countEventsInWindow(
+        recentSessions.map((session) => session._creationTime),
+        now,
+        CONTACT_SESSION_CREATE_WINDOW_MS,
+      ) >= CONTACT_SESSION_CREATE_MAX
+    ) {
+      throw new ConvexError({
+        code: "RATE_LIMITED",
+        message: "Too many session attempts. Please wait and try again.",
+      });
+    }
+
     const expiresAt = now + SESSION_DURATION_MS;
 
     const contactSessionId = await ctx.db.insert("contactSessions", {
-      name: args.name,
-      email: args.email,
-      organizationId: args.organizationId,
+      name,
+      email,
+      organizationId,
       expiresAt,
       metadata: args.metadata,
     });
@@ -40,11 +94,82 @@ export const create = mutation({
   },
 });
 
-export const validate = mutation({
+function metadataIsBounded(
+  metadata: Record<string, unknown> | undefined,
+): boolean {
+  if (!metadata) return true;
+  return Object.values(metadata).every(
+    (value) => typeof value !== "string" || value.length <= 512,
+  );
+}
+
+export const issueSignedToken = mutation({
   args: {
     contactSessionId: v.id("contactSessions"),
   },
   handler: async (ctx, args) => {
+    const contactSession = await ctx.db.get(args.contactSessionId);
+
+    if (!contactSession || contactSession.expiresAt < Date.now()) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Contact session expired or not found",
+      });
+    }
+
+    const token = await createSignedSessionToken({
+      sessionId: contactSession._id,
+      orgId: contactSession.organizationId,
+      exp: contactSession.expiresAt,
+    });
+
+    return {
+      sessionToken: token,
+      expiresAt: contactSession.expiresAt,
+    };
+  },
+});
+
+export const validate = mutation({
+  args: {
+    contactSessionId: v.optional(v.id("contactSessions")),
+    sessionToken: v.optional(v.string()),
+    organizationId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // 1. If an HMAC-SHA256 signed session token is provided, cryptographically verify it
+    if (args.sessionToken) {
+      const tokenVerification = await verifySignedSessionToken(
+        args.sessionToken,
+        args.organizationId
+      );
+      if (!tokenVerification.valid || !tokenVerification.payload) {
+        return {
+          valid: false,
+          reason:
+            tokenVerification.reason ||
+            "Cryptographic session token verification failed",
+        };
+      }
+
+      const typedSessionId =
+        tokenVerification.payload.sessionId as Id<"contactSessions">;
+      const contactSession = await ctx.db
+        .query("contactSessions")
+        .filter((q) => q.eq(q.field("_id"), typedSessionId))
+        .first();
+      if (!contactSession || contactSession.expiresAt < Date.now()) {
+        return { valid: false, reason: "Contact session expired or not found" };
+      }
+
+      return { valid: true, sessionId: contactSession._id };
+    }
+
+    // 2. Fallback to raw database ID validation for backward compatibility
+    if (!args.contactSessionId) {
+      return { valid: false, reason: "No contact session identifier provided" };
+    }
+
     const contactSession = await ctx.db.get(args.contactSessionId);
 
     if (!contactSession) {
@@ -55,6 +180,6 @@ export const validate = mutation({
       return { valid: false, reason: "Contact session expired" };
     }
 
-    return { valid: true, contactSession };
+    return { valid: true };
   },
 });

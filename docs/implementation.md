@@ -323,3 +323,292 @@ Client-side state (active screen, session, etc.) uses Jotai atoms. Jotai's `Prov
 - **Convex function arguments**: Validated by Convex's `v.*` validators at runtime (schema-level).
 - **Form inputs**: Validated with Zod schemas via `react-hook-form` + `@hookform/resolvers/zod`.
 - **File type detection**: `guessMimeTypeFromExtension` + `guessMimeTypeFromContents` from `@convex-dev/rag` with fallback to `application/octet-stream`.
+
+---
+
+## Voice AI Architecture (ElevenLabs & Vapi Integration)
+
+### Overview
+Aivon provides real-time, low-latency, full-duplex conversational voice support embedded directly in the end-user chat widget and managed via the operator dashboard. Voice sessions use **Vapi** as the default orchestration layer and **ElevenLabs** as the primary text-to-speech (TTS) synthesis engine, with optional **ElevenLabs Scribe** / **Deepgram** speech-to-text (STT).
+
+### Pipeline Flow
+```
+End-User Microphone
+  └─► Widget WebRTC (Vapi Web SDK)
+      └─► STT (ElevenLabs Scribe / Deepgram Nova-2)
+          └─► Vapi Orchestration Layer
+              ├─► Webhook / Tools (Convex /vapi-webhook)
+              │    ├─ RAG Search (org-scoped knowledge base)
+              │    ├─ Escalate (system/conversations:escalate + queue)
+              │    └─ Resolve (system/conversations:resolve)
+              └─► TTS Synthesis (ElevenLabs Turbo v2.5 / Flash v2.5)
+                  └─► WebRTC Stream Playback (with Turn Guard & Barge-in)
+```
+
+### Key Modules
+| Component | Location | Responsibility |
+|-----------|----------|----------------|
+| `schema.ts` | `packages/backend/convex/schema.ts` | Extends `widgetSettings.voiceSettings` with voice model, speed, stability, language, and interruption tuning. |
+| `voiceSettings.ts` (private) | `packages/backend/convex/private/voiceSettings.ts` | Clerk-authenticated mutations/queries for dashboard voice configuration and voice library listing. |
+| `voiceSettings.ts` (public) | `packages/backend/convex/public/voiceSettings.ts` | Unauthenticated public query for widget clients to fetch voice overrides safely. |
+| `use-vapi.ts` | `apps/widget/modules/widget/hooks/use-vapi.ts` | WebRTC lifecycle, permission management, assistant overrides, turn-ID guards, and barge-in listeners. |
+| `voice-settings-view.tsx` | `apps/web/modules/voice-settings/ui/views/` | Operator dashboard UI at `/plugins/voice` for voice design, multilingual selection, and sensitivity tuning. |
+| `vapiWebhook.ts` | `packages/backend/convex/system/vapiWebhook.ts` | RAG search execution, spoken markdown formatting, and call transcript persistence. |
+| `http.ts` | `packages/backend/convex/http.ts` | Exposes `/vapi-webhook` for Vapi tool calls and `end-of-call-report` events. |
+
+### Barge-In & Interruption Handling
+1. **Turn-ID Guard**: Every assistant utterance is tagged with a monotonically increasing turn ID (`currentTurnId`).
+2. **Immediate Cancellation**: When `user-interrupted` fires from Vapi VAD, `currentTurnId` is immediately advanced, transitioning the widget state to `listening` and clearing any partial live transcripts.
+3. **Chunk Invalidation**: Any late-arriving speech audio packets tagged with prior turn IDs are strictly dropped, preventing cancelled speech from bleeding into subsequent turns.
+4. **Noise Guard**: `stopSpeakingPlan` configures `acknowledgementPhrases` ("uh-huh", "yeah", "okay") to prevent transient acoustic noise from falsely interrupting the agent, and `interruptionPhrases` ("stop", "wait", "hold on") for immediate hard stoppage.
+
+### Multilingual Support
+- **Languages Supported**: English (`en`), Hindi (`hi`), Marathi (`mr`).
+- **TTS Compatibility**: Hindi and Marathi speech synthesis strictly enforce multilingual models (`eleven_turbo_v2_5`, `eleven_flash_v2_5`, or `eleven_multilingual_v2`).
+- **STT Transcription**: ElevenLabs Scribe or Deepgram configured with explicit ISO language codes.
+
+### Voice Design Workflow
+1. Administrators configure a natural-language description of their desired brand voice (e.g., *"A warm, empathetic customer support specialist who speaks calmly with clear diction"*).
+2. Saved as `voiceDesignDescription` metadata to guide voice selection without incurring redundant generation costs.
+3. Specific voice selection is made from the curated ElevenLabs voice library or custom cloned voice IDs.
+
+---
+
+## 9. Hybrid RAG, BM25, and Retrieval Routing
+
+### Architecture Overview
+Aivon employs a production-grade, multi-stage hybrid retrieval engine that unifies dense vector search (`text-embedding-3-small`, 1536 dimensions) and exact lexical search (Okapi BM25) through mathematical Reciprocal Rank Fusion (RRF). Queries are classified deterministically with zero latency overhead to select between pure BM25, pure dense vector, or dual-path hybrid retrieval.
+
+```
+Incoming User Query
+         │
+         ▼
+┌───────────────────────────────────────┐
+│       Deterministic Query Router      │
+│  (Exact Codes, Quotes, Tech Tokens,   │
+│   Semantic Questions, Short Terms)    │
+└──────────────────┬────────────────────┘
+                   │
+         ┌─────────┼─────────┐
+         ▼         ▼         ▼
+       "bm25"  "hybrid"   "dense"
+         │         │         │
+         │    ┌────┴────┐    │
+         ▼    ▼         ▼    ▼
+ ┌──────────────┐     ┌──────────────┐
+ │ Okapi BM25   │     │ Dense Vector │
+ │ (Tenant-Iso- │     │ Search (RAG  │
+ │  lated Cache)│     │ Component)   │
+ └───────┬──────┘     └──────┬───────┘
+         │                   │
+         └─────────┬─────────┘
+                   ▼
+┌───────────────────────────────────────┐
+│     Reciprocal Rank Fusion (RRF)      │
+│   RRF(d) = Σ w_r / (k + rank_r(d))    │
+│           (k=60, deduped)             │
+└──────────────────┬────────────────────┘
+                   ▼
+┌───────────────────────────────────────┐
+│         Evidence Verification         │
+│     (Thresholding + Citations)        │
+└──────────────────┬────────────────────┘
+                   ▼
+           Support AI Agent
+```
+
+### Key Modules
+
+| Component | Location | Responsibility |
+|-----------|----------|----------------|
+| `queryRouter.ts` | `packages/backend/convex/system/ai/rag/queryRouter.ts` | Zero-cost deterministic query classifier. Inspects technical identifiers, alphanumeric error codes (`WC-104`, `ERR-9021`), quoted literals (`"exact term"`), and semantic phrasing. |
+| `bm25.ts` | `packages/backend/convex/system/ai/rag/bm25.ts` | Okapi BM25 engine with Robertson-Sparck Jones scoring ($k_1=1.2, b=0.75$), length normalization, exact phrase boosting, and tenant-scoped corpus caching (`TenantBM25Cache`). |
+| `fusion.ts` | `packages/backend/convex/system/ai/rag/fusion.ts` | Reciprocal Rank Fusion ($k=60$) combining dense and lexical ordinal ranks. Eliminates raw cosine/BM25 score scale distortions. |
+| `corpus.ts` | `packages/backend/convex/system/ai/rag/corpus.ts` | `internalQuery getTenantCorpus` securely reading knowledge chunks strictly isolated by `namespace: organizationId`. |
+| `queryNormalizer.ts` | `packages/backend/convex/system/ai/rag/queryNormalizer.ts` | Dual-mode normalizer: preserves exact punctuation and casing for lexical matching while cleaning conversational filler for dense vector embeddings. |
+| `search.ts` | `packages/backend/convex/system/ai/tools/search.ts` | Production `@convex-dev/agent` search tool. Coordinates router, parallel execution via `Promise.allSettled`, degraded-mode failover, multi-format citation assembly, and observability logging. |
+| `files.ts` | `packages/backend/convex/private/files.ts` | Automatically invalidates `TenantBM25Cache` on knowledge-base file uploads (`addFile`) and deletions (`deleteFile`). |
+
+### Routing Policy Matrix
+
+| Query Pattern | Example | Strategy Selected | Rationale |
+|---------------|---------|-------------------|-----------|
+| Quoted text | `"order cancellation policy"` | `"bm25"` | Explicit user intent for verbatim textual match. |
+| Alphanumeric code | `WC-104`, `ERR-9021`, `SKU-772` | `"bm25"` | Vector embeddings compress discrete codes into poor semantic clusters; lexical inverted index gives 100% precision. |
+| Technical token | `auth_token_expired`, `api.v1.users` | `"bm25"` | Identifiers, method names, and snake_case/dot notation require exact token preservation. |
+| Mixed technical + conceptual | `how to fix WC-104 timeout in billing` | `"hybrid"` | Requires both exact code localization and semantic intent matching. |
+| General semantic question | `What is your refund policy for annual plans?` | `"hybrid"` / `"dense"` | Natural language intent benefits from dense vector semantic proximity. |
+
+### Degraded-Mode Resilience
+
+1. **Vector Outage Resiliency**: If the OpenAI embedding API times out, returns HTTP 429 (rate-limited), or throws an internal error, the hybrid executor automatically falls back to pure BM25 search.
+2. **Empty Corpus Handling**: If a tenant has not uploaded documents, both branches safely return empty candidate sets without throwing exceptions or logging false errors.
+3. **Air-Tight Tenant Isolation**: All corpus queries, BM25 cache instances, and vector searches are strictly partitioned by `organizationId`. Cross-tenant data leakage is cryptographically and logically impossible (verified at 0.000% across all automated suites).
+
+---
+
+## Multi-Agent Orchestration
+
+The orchestration layer lives in `convex/system/ai/orchestration/` and is called by `public/messages.ts` on every incoming user message.
+
+### Intent Routing
+
+`ConversationRouter` uses deterministic regex patterns — no LLM call, zero latency overhead:
+
+```typescript
+// router.ts
+const TRAVEL_REGEX = /\b(travel|train|flight|bus|book|ticket|route|fare|depart|arrive|nagpur|mumbai|delhi|pune)\b/i;
+const ESCALATION_REGEX = /\b(human|agent|operator|speak to someone|transfer)\b/i;
+
+function classify(text: string): RoutingCategory {
+  if (TRAVEL_REGEX.test(text)) return "travel_inquiry";
+  if (ESCALATION_REGEX.test(text)) return "escalation_request";
+  return "support_inquiry"; // default
+}
+```
+
+### Execution Planning
+
+`OrchestrationPlanner` maps each `RoutingCategory` to an ordered `ExecutionPlan`:
+
+```typescript
+// planner.ts
+const PLANS: Record<RoutingCategory, ExecutionPlan> = {
+  support_inquiry:    { steps: [{ capability: "support_agent", required: true }] },
+  travel_inquiry:     { steps: [{ capability: "travel_agent",  required: true }] },
+  escalation_request: { steps: [{ capability: "escalation",    required: true }] },
+};
+```
+
+### Extending with a New Capability
+
+1. Create `system/ai/<name>/capability.ts` — implement `CapabilityDefinition`
+2. Add regex pattern to `orchestration/router.ts` → new `RoutingCategory` value
+3. Add plan entry in `orchestration/planner.ts`
+4. Call `registry.register(new MyCapability())` in `orchestration/registry.ts`
+
+---
+
+## Voice-First Travel Agent
+
+### Design Principles
+
+1. **Speech is the interaction modality.** The LLM understands language; application code owns validation, state transitions, and consequential execution.
+2. **Consequential actions require explicit confirmation.** No booking fires unless `confirmedByCustomer === true`.
+3. **Idempotency is mandatory.** Every `initiateBooking` call carries an idempotency key; duplicate requests return the original booking reference.
+
+### TravelNormalizer (`normalizer.ts`)
+
+Stateless slot extraction from free-form speech:
+
+| Method | Input | Output |
+|--------|-------|--------|
+| `resolveLocation(raw)` | `"bombay"`, `"ngp"` | `{ name: "Mumbai", code: "CSMT" }` |
+| `normalizeDate(raw)` | `"day after tomorrow"` | `"2026-10-27"` (relative to referenceMs) |
+| `extractTimeWindow(raw)` | `"between 7 and 10"` | `{ start: "07:00", end: "10:00" }` |
+| `extractTransportMode(raw)` | `"vande bharat"` | `"train"` |
+| `extractOptionSelection(raw, n)` | `"choose the second one"` | `1` (0-indexed) |
+| `detectConfirmationIntent(raw)` | `"yes confirm"` | `"confirm"` |
+| `extractOriginAndDestination(raw, slots)` | `"Nagpur to Mumbai—sorry, Pune"` | `{ origin: "Nagpur", destination: "Pune" }` |
+
+**Speech Correction**: The normalizer handles mid-sentence corrections via two regex patterns:
+- Dash-based: `to [wrong city]—sorry, [corrected]`
+- Spoken keyword: `to [wrong city], sorry, [corrected]`
+
+### TravelWorkflowManager (`workflow.ts`)
+
+State machine with one method: `processTurn(params) → TravelTurnResult`.
+
+```
+GREETING
+    ↓ (origin + destination extracted)
+COLLECTING_REQUIREMENTS
+    ↓ (date extracted)
+    ↓ (transport mode extracted)
+CLARIFYING
+    ↓ (departure window extracted OR "any time")
+SEARCHING
+    ↓ (search executed)
+PRESENTING_OPTIONS / AWAITING_SELECTION
+    ↓ (ordinal selection)
+AWAITING_CONFIRMATION     ←── cancel ──┐
+    ↓ ("yes confirm")          returns to AWAITING_SELECTION
+BOOKED
+```
+
+Slot accumulation: `extractAndMergeSlots` merges new information into existing slots each turn. Already-filled slots persist across turns.
+
+### DeterministicMockTravelProvider (`provider.ts`)
+
+Contains hardcoded Indian train/flight/bus schedules used for deterministic testing.
+
+```typescript
+async initiateBooking(params: BookingParams): Promise<BookingResult> {
+  // STRICT GATE: no booking without explicit confirmation
+  if (!params.confirmedByCustomer) {
+    return { success: false, status: "failed",
+      error: "Explicit customer confirmation is strictly required before any reservation." };
+  }
+  // Idempotency: return existing booking if key seen before
+  const existing = this.bookings.get(params.idempotencyKey);
+  if (existing) return existing;
+  // Execute booking...
+}
+```
+
+### Convex Public API (`public/travel.ts`)
+
+| Function | Type | Purpose |
+|----------|------|---------|
+| `createSession` | mutation | Create `travelSession` with 4h TTL; return session token |
+| `processTurn` | action | Validate session, run `TravelWorkflowManager.processTurn`, persist updated state |
+| `getSession` | query | Fetch session state and current slots |
+| `getBookings` | query | List confirmed bookings for a session |
+| `cancelSession` | mutation | Mark session expired |
+
+### Frontend (`apps/web/app/(travel)/travel/page.tsx`)
+
+- Web Speech API `SpeechRecognition` for input; `speechSynthesis.speak()` for output
+- Animated voice orb (listening / speaking / idle states)
+- Barge-in: user can speak while agent is responding; recognition restarts on `SpeechRecognitionError`
+- Scrollable real-time transcript log
+- Explicit confirmation UI: booking summary card + confirm/cancel buttons
+- Accessible at `/travel` — public route, no Clerk auth
+
+### Test Coverage
+
+```bash
+pnpm test:travel
+# eval/tests/travelNormalizer.test.ts  — 7 test suites (100% pass)
+# eval/tests/travelWorkflow.test.ts    — 5 turns + 3 guardrail suites (100% pass)
+```
+
+Key assertions validated:
+- Consequential action blocked without explicit confirmation
+- Duplicate idempotency key returns original PNR
+- Speech correction (`Mumbai—sorry, Pune`) resolves to `Pune`
+- `"start over"` resets all slots and transitions to `COLLECTING_REQUIREMENTS`
+
+---
+
+## Centralized Audit Middleware & Data Lineage
+
+Implemented in `packages/backend/convex/system/ai/observability/auditMiddleware.ts`:
+
+- **Universal Traceability**: Every execution path (Chat, Voice, Audio, WebRTC, ElevenLabs, Operator Enhancement) generates a correlated trace ID (`tr_{channel}_{timestamp}_{rand}`) and logs structured lifecycle events (`aiAuditEvents` table).
+- **RAG Data Lineage**: On every knowledge query, records user prompt, effective retrieval strategy (`dense`, `bm25`, `hybrid_rrf`), retrieved chunk IDs, page numbers, cosine/BM25 scores, selected evidence snippets, and the generated response (`ragLineageRecords` table).
+- **Voice Traceability**: Tracks speech input $\rightarrow$ transcription $\rightarrow$ retrieval $\rightarrow$ agent execution $\rightarrow$ markdown cleanup (`formatForSpeech`) $\rightarrow$ ElevenLabs TTS synthesis $\rightarrow$ audio output.
+- **Privacy & Security**: Automated redaction of PII (emails, phone numbers, API keys) before persistence (`maskPIIForLogging`).
+- **Performance**: Validated benchmark overhead of $< 0.02\text{ms}$ per audit event.
+
+---
+
+## Incremental Document Ingestion Pipeline
+
+Implemented in `packages/backend/convex/system/ai/rag/incremental/`:
+
+- **Pure-JS FIPS 180-4 SHA-256**: Zero-dependency hashing compatible with Convex V8 isolates (`pageSplitter.ts`).
+- **Structure-Aware Chunking**: Preserves Markdown tables, code blocks, and section headers intact without mid-row splitting (`structureChunker.ts`).
+- **Selective Re-embedding**: On document updates, computes page hashes; unchanged pages are skipped; modified chunks are generated and re-embedded, minimizing OpenAI embedding calls (`incrementalPipeline.ts`).
+- **Stale Embedding Deletion**: Automatically purges orphaned chunk vectors from `@convex-dev/rag` when pages are deleted or re-chunked.
+

@@ -20,11 +20,33 @@ export default defineSchema({
       assistantId: v.optional(v.string()),
       phoneNumber: v.optional(v.string()),
     }),
+    // ElevenLabs / multilingual voice configuration (applied as Vapi overrides at call start)
+    voiceSettings: v.optional(v.object({
+      // TTS
+      elevenLabsVoiceId: v.optional(v.string()),          // e.g. "rachel" or custom voice ID
+      elevenLabsModel: v.optional(v.string()),             // e.g. "eleven_turbo_v2_5"
+      elevenLabsStability: v.optional(v.number()),         // 0–1
+      elevenLabsSimilarityBoost: v.optional(v.number()),   // 0–1
+      elevenLabsSpeed: v.optional(v.number()),             // 0.7–1.2
+      elevenLabsOptimizeStreamingLatency: v.optional(v.number()), // 0–4, default 3
+      // STT
+      transcriberProvider: v.optional(v.string()),         // "11labs" | "deepgram" (default)
+      transcriberLanguage: v.optional(v.string()),         // ISO 639-1: "en", "hi", "mr"
+      // Interruption / turn-taking
+      interruptionNumWords: v.optional(v.number()),        // words before stop (default 0)
+      interruptionVoiceSeconds: v.optional(v.number()),    // VAD seconds (default 0.2)
+      interruptionBackoffSeconds: v.optional(v.number()),  // re-speak delay (default 1)
+      startSpeakingWaitSeconds: v.optional(v.number()),    // pre-speech pause (default 0.4)
+      // Voice Design metadata (stored separately from voiceId — not re-generated per call)
+      voiceDesignDescription: v.optional(v.string()),      // natural-language design prompt
+      voiceDesignType: v.optional(v.string()),             // "library" | "generated"
+      voiceConfigVersion: v.optional(v.number()),          // monotone increment on config change
+    })),
   })
   .index("by_organization_id", ["organizationId"]),
   plugins: defineTable({
     organizationId: v.string(),
-    service: v.union(v.literal("vapi")),
+    service: v.union(v.literal("vapi"), v.literal("elevenlabs")),
     secretName: v.string(),
   })
     .index("by_organization_id", ["organizationId"])
@@ -68,6 +90,7 @@ export default defineSchema({
     }))
   })
   .index("by_organization_id", ["organizationId"])
+  .index("by_organization_id_and_email", ["organizationId", "email"])
   .index("by_expires_at", ["expiresAt"]),
   supportQueue: defineTable({
     organizationId: v.string(),
@@ -128,7 +151,8 @@ export default defineSchema({
   })
     .index("by_organization_id", ["organizationId"])
     .index("by_organization_id_and_status", ["organizationId", "status"])
-    .index("by_agent_id", ["agentId"]),
+    .index("by_agent_id", ["agentId"])
+    .index("by_organization_id_and_agent_id", ["organizationId", "agentId"]),
   supportCalls: defineTable({
     organizationId: v.string(),
     queueEntryId: v.id("supportQueue"),
@@ -155,4 +179,342 @@ export default defineSchema({
   users: defineTable({
     name: v.string(),
   }),
+  evaluations: defineTable({
+    organizationId: v.string(),
+    conversationId: v.id("conversations"),
+    threadId: v.string(),
+    traceId: v.optional(v.string()),
+    userQuestion: v.string(),
+    agentAnswer: v.string(),
+    retrievedEvidence: v.optional(v.string()),
+    evidenceIds: v.optional(v.array(v.string())),
+    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
+    judgeModel: v.string(),
+    rubricVersion: v.string(),
+    scores: v.optional(v.object({
+      faithfulness: v.object({ score: v.number(), rationale: v.string() }),
+      answerRelevance: v.object({ score: v.number(), rationale: v.string() }),
+      contextRelevance: v.object({ score: v.number(), rationale: v.string() }),
+      completeness: v.object({ score: v.number(), rationale: v.string() }),
+      citationValidity: v.object({ pass: v.boolean(), rationale: v.string() }),
+      policyCompliance: v.object({ pass: v.boolean(), rationale: v.string() }),
+      toolUseCorrectness: v.optional(v.object({ score: v.number(), rationale: v.string() })),
+      overallScore: v.number(),
+      needsHumanReview: v.boolean(),
+    })),
+    humanReviewStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("flagged"))),
+    humanReviewNotes: v.optional(v.string()),
+    humanReviewedBy: v.optional(v.string()),
+    humanReviewedAt: v.optional(v.number()),
+    latencyMs: v.optional(v.number()),
+    costUsd: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_conversation_id", ["conversationId"])
+    .index("by_organization_id_and_status", ["organizationId", "status"]),
+
+  customerMemories: defineTable({
+    organizationId: v.string(),
+    customerIdentifier: v.string(), // Normalized customer email or identifier
+    contactSessionId: v.optional(v.id("contactSessions")),
+    memoryType: v.union(v.literal("semantic"), v.literal("episodic"), v.literal("entity")),
+    key: v.string(), // e.g. "preference.communication_channel", "entity.device_model"
+    content: v.string(),
+    confidence: v.number(), // 0.0 to 1.0
+    provenance: v.object({
+      conversationId: v.optional(v.id("conversations")),
+      source: v.string(),
+      extractedAt: v.number(),
+    }),
+    status: v.union(
+      v.literal("active"),
+      v.literal("superseded"),
+      v.literal("expired"),
+      v.literal("deleted")
+    ),
+    expiresAt: v.optional(v.number()),
+    contentHash: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_org_and_customer", ["organizationId", "customerIdentifier", "status"])
+    .index("by_org_and_type", ["organizationId", "memoryType"])
+    .index("by_expires_at", ["expiresAt"]),
+
+  semanticAnswerCache: defineTable({
+    organizationId: v.string(),
+    canonicalQuery: v.string(),
+    queryHash: v.string(),
+    response: v.string(),
+    evidenceIds: v.array(v.string()),
+    sourceDocuments: v.array(v.string()),
+    model: v.string(),
+    knowledgeVersion: v.string(),
+    hitCount: v.number(),
+    lastAccessedAt: v.number(),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_org_and_query_hash", ["organizationId", "queryHash"])
+    .index("by_org_and_expires", ["organizationId", "expiresAt"]),
+
+  backgroundJobs: defineTable({
+    organizationId: v.string(),
+    jobType: v.union(
+      v.literal("document_ingestion"),
+      v.literal("evaluation_batch"),
+      v.literal("memory_extraction"),
+      v.literal("cache_maintenance")
+    ),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("running"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("cancelled")
+    ),
+    priority: v.union(v.literal("low"), v.literal("normal"), v.literal("high")),
+    payload: v.string(), // Serialized JSON input payload or storage reference
+    idempotencyKey: v.string(),
+    attempts: v.number(),
+    maxAttempts: v.number(),
+    progress: v.optional(v.number()), // 0 - 100
+    error: v.optional(v.string()),
+    result: v.optional(v.string()),
+    scheduledFor: v.number(),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_org_and_status", ["organizationId", "status"])
+    .index("by_idempotency_key", ["idempotencyKey"])
+    .index("by_status_and_scheduled", ["status", "scheduledFor"]),
+
+  tenantRateLimits: defineTable({
+    organizationId: v.string(),
+    tier: v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise")),
+    tokensUsedThisMonth: v.number(),
+    monthlyTokenQuota: v.number(),
+    monthlyPeriodStart: v.number(),
+    requestsThisMinute: v.number(),
+    minuteWindowStart: v.number(),
+    concurrentOperationsActive: v.number(),
+    maxConcurrentOperations: v.number(),
+    lastActiveAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"]),
+
+  keyedRateLimits: defineTable({
+    key: v.string(),
+    windowStart: v.number(),
+    count: v.number(),
+  }).index("by_key", ["key"]),
+
+  orchestrationExecutions: defineTable({
+    organizationId: v.string(),
+    conversationId: v.id("conversations"),
+    threadId: v.string(),
+    triggerMessage: v.string(),
+    idempotencyKey: v.string(),
+    channel: v.union(v.literal("chat"), v.literal("voice"), v.literal("operator")),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("escalated"),
+      v.literal("waiting_for_approval"),
+      v.literal("failed"),
+      v.literal("cancelled")
+    ),
+    routingCategory: v.string(),
+    executionPlan: v.string(), // Serialized JSON execution plan
+    stepResults: v.string(), // Serialized JSON step results
+    finalResponse: v.optional(v.string()),
+    error: v.optional(v.string()),
+    latencyMs: v.optional(v.number()),
+    totalTokensUsed: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_conversation_id", ["conversationId"])
+    .index("by_idempotency_key", ["idempotencyKey"])
+    .index("by_org_and_status", ["organizationId", "status"]),
+
+  travelSessions: defineTable({
+    organizationId: v.string(),
+    sessionToken: v.string(),
+    contactSessionId: v.optional(v.id("contactSessions")),
+    conversationId: v.optional(v.id("conversations")),
+    status: v.union(
+      v.literal("GREETING"),
+      v.literal("COLLECTING_REQUIREMENTS"),
+      v.literal("CLARIFYING"),
+      v.literal("SEARCHING"),
+      v.literal("PRESENTING_OPTIONS"),
+      v.literal("AWAITING_SELECTION"),
+      v.literal("COLLECTING_PASSENGER_DETAILS"),
+      v.literal("AWAITING_CONFIRMATION"),
+      v.literal("EXECUTING_BOOKING"),
+      v.literal("BOOKED"),
+      v.literal("CANCELLED"),
+      v.literal("FAILED")
+    ),
+    extractedSlots: v.object({
+      transportMode: v.optional(v.union(v.literal("train"), v.literal("flight"), v.literal("bus"))),
+      origin: v.optional(v.string()),
+      originCode: v.optional(v.string()),
+      destination: v.optional(v.string()),
+      destinationCode: v.optional(v.string()),
+      travelDate: v.optional(v.string()),
+      departureWindowStart: v.optional(v.string()),
+      departureWindowEnd: v.optional(v.string()),
+      passengerCount: v.optional(v.number()),
+      passengers: v.optional(
+        v.array(
+          v.object({
+            name: v.string(),
+            age: v.optional(v.number()),
+            gender: v.optional(v.string()),
+          })
+        )
+      ),
+      selectedOptionId: v.optional(v.string()),
+      preference: v.optional(v.string()),
+    }),
+    searchResults: v.optional(v.string()), // Serialized JSON array of TravelOption
+    selectedOption: v.optional(v.string()), // Serialized JSON TravelOption
+    confirmationRequired: v.boolean(),
+    confirmedAt: v.optional(v.number()),
+    bookingReference: v.optional(v.string()),
+    idempotencyToken: v.string(),
+    lastSpokenTurn: v.optional(v.string()),
+    lastActiveAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_session_token", ["sessionToken"])
+    .index("by_idempotency_token", ["idempotencyToken"]),
+
+  travelBookings: defineTable({
+    organizationId: v.string(),
+    travelSessionId: v.id("travelSessions"),
+    bookingReference: v.string(),
+    transportMode: v.union(v.literal("train"), v.literal("flight"), v.literal("bus")),
+    origin: v.string(),
+    originCode: v.string(),
+    destination: v.string(),
+    destinationCode: v.string(),
+    travelDate: v.string(),
+    departureTime: v.string(),
+    arrivalTime: v.string(),
+    serviceName: v.string(),
+    serviceNumber: v.string(),
+    fare: v.number(),
+    currency: v.string(),
+    passengers: v.array(
+      v.object({
+        name: v.string(),
+        age: v.number(),
+        gender: v.string(),
+        seatNumber: v.optional(v.string()),
+        status: v.string(),
+      })
+    ),
+    status: v.union(v.literal("confirmed"), v.literal("cancelled"), v.literal("pending")),
+    idempotencyKey: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_booking_reference", ["bookingReference"])
+    .index("by_idempotency_key", ["idempotencyKey"]),
+
+  aiAuditEvents: defineTable({
+    organizationId: v.string(),
+    traceId: v.string(),
+    conversationId: v.optional(v.id("conversations")),
+    threadId: v.optional(v.string()),
+    contactSessionId: v.optional(v.id("contactSessions")),
+    channel: v.union(
+      v.literal("chat"),
+      v.literal("voice"),
+      v.literal("operator"),
+      v.literal("system")
+    ),
+    eventType: v.string(), // "request.init", "auth.decision", "moderation.check", "rag.retrieval", "agent.execution", "llm.generation", "tts.synthesis", "security.violation", "error"
+    stage: v.string(),
+    status: v.union(
+      v.literal("success"),
+      v.literal("failed"),
+      v.literal("warning"),
+      v.literal("blocked")
+    ),
+    model: v.optional(v.string()),
+    latencyMs: v.optional(v.number()),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+    costUsd: v.optional(v.number()),
+    error: v.optional(v.string()),
+    metadata: v.optional(v.string()), // Serialized JSON of stage-specific metadata
+    timestamp: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_conversation_id", ["conversationId"])
+    .index("by_trace_id", ["traceId"])
+    .index("by_org_and_timestamp", ["organizationId", "timestamp"]),
+
+  ragLineageRecords: defineTable({
+    organizationId: v.string(),
+    traceId: v.string(),
+    conversationId: v.optional(v.id("conversations")),
+    threadId: v.optional(v.string()),
+    channel: v.union(
+      v.literal("chat"),
+      v.literal("voice"),
+      v.literal("operator")
+    ),
+    userQuery: v.string(),
+    effectiveStrategy: v.string(), // "dense" | "bm25" | "hybrid_rrf"
+    retrievedEvidence: v.array(
+      v.object({
+        evidenceId: v.string(),
+        documentId: v.string(),
+        documentName: v.string(),
+        pageNumber: v.optional(v.number()),
+        section: v.optional(v.string()),
+        chunkId: v.optional(v.string()),
+        contentType: v.string(), // "table" | "chart" | "prose" | "structured_data"
+        score: v.number(),
+        snippet: v.string(),
+        retrievalSource: v.string(), // "dense" | "bm25" | "hybrid_rrf"
+      })
+    ),
+    generatedResponse: v.string(),
+    speechFormattedResponse: v.optional(v.string()),
+    model: v.string(),
+    voiceMetadata: v.optional(
+      v.object({
+        provider: v.optional(v.string()), // "vapi" | "elevenlabs" | "web_speech"
+        voiceId: v.optional(v.string()),
+        modelId: v.optional(v.string()),
+        audioDurationSeconds: v.optional(v.number()),
+      })
+    ),
+    latencyMs: v.number(),
+    tokensUsed: v.number(),
+    hasEvidence: v.boolean(),
+    timestamp: v.number(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_conversation_id", ["conversationId"])
+    .index("by_trace_id", ["traceId"])
+    .index("by_org_and_timestamp", ["organizationId", "timestamp"]),
 });
+

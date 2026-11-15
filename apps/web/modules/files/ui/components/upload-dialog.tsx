@@ -139,8 +139,14 @@ export const UploadDialog = ({
           <Dropzone
             accept={{
               "application/pdf": [".pdf"],
-              "text/csv": [".csv"],
               "text/plain": [".txt"],
+              "text/csv": [".csv"],
+              "text/tab-separated-values": [".tsv"],
+              "application/json": [".json"],
+              "text/markdown": [".md", ".markdown"],
+              "image/png": [".png"],
+              "image/jpeg": [".jpg", ".jpeg"],
+              "image/webp": [".webp"],
             }}
             disabled={isUploading}
             maxFiles={1}

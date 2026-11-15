@@ -3,26 +3,48 @@ import { action, query } from "../_generated/server";
 import { components, internal } from "../_generated/api";
 import { supportAgent } from "../system/ai/agents/supportAgent";
 import { paginationOptsValidator } from "convex/server";
-import { escalateConversation } from "../system/ai/tools/escalateConversation";
-import { resolveConversation } from "../system/ai/tools/resolveConversation";
 import { saveMessage } from "@convex-dev/agent";
-import { search } from "../system/ai/tools/search";
-import { sanitizeUserInput, validateAgentOutput, checkRateLimit } from "../system/ai/security";
-import { logAIOperation } from "../system/ai/observability";
-import { estimateTokens } from "../system/ai/context";
+import { ModerationPipeline } from "../system/ai/security";
+import { orchestrateConversationTurn } from "../system/ai/orchestration";
+import { verifySignedSessionToken } from "../lib/sessionToken";
+import {
+  isConfiguredDemoOrganization,
+  MAX_PROMPT_LENGTH,
+  SESSION_MESSAGE_MAX_REQUESTS,
+  SESSION_MESSAGE_WINDOW_MS,
+} from "../lib/requestSecurity";
 
 export const create = action({
   args: {
     prompt: v.string(),
     threadId: v.string(),
     contactSessionId: v.id("contactSessions"),
+    sessionToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Cryptographically verify HMAC-SHA256 session token if provided
+    if (args.sessionToken) {
+      const tokenVerification = await verifySignedSessionToken(args.sessionToken);
+      if (!tokenVerification.valid || !tokenVerification.payload) {
+        throw new ConvexError({
+          code: "UNAUTHORIZED",
+          message:
+            tokenVerification.reason ||
+            "Cryptographic signature verification failed (tampered session token)",
+        });
+      }
+      if (tokenVerification.payload.sessionId !== String(args.contactSessionId)) {
+        throw new ConvexError({
+          code: "UNAUTHORIZED",
+          message: "Session token does not match contact session identity",
+        });
+      }
+    }
     const contactSession = await ctx.runQuery(
       internal.system.contactSessions.getOne,
       {
         contactSessionId: args.contactSessionId,
-      }
+      },
     );
 
     if (!contactSession || contactSession.expiresAt < Date.now()) {
@@ -46,6 +68,16 @@ export const create = action({
       });
     }
 
+    if (
+      conversation.contactSessionId !== contactSession._id ||
+      conversation.organizationId !== contactSession.organizationId
+    ) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Incorrect session",
+      });
+    }
+
     if (conversation.status === "resolved") {
       throw new ConvexError({
         code: "BAD_REQUEST",
@@ -58,7 +90,7 @@ export const create = action({
       internal.system.widgetSettings.getByOrganizationId,
       {
         organizationId: conversation.organizationId,
-      }
+      },
     );
 
     const maxMessages =
@@ -67,32 +99,72 @@ export const create = action({
         ? widgetSettings.maxMessagesPerConversation
         : 20;
 
-    try {
-      const existingMessages = await supportAgent.listMessages(ctx, {
-        threadId: args.threadId,
-        paginationOpts: { numItems: maxMessages + 1, cursor: null },
+    const existingMessages = await supportAgent.listMessages(ctx, {
+      threadId: args.threadId,
+      paginationOpts: { numItems: maxMessages + 1, cursor: null },
+    });
+    if (existingMessages.page.length >= maxMessages) {
+      throw new ConvexError({
+        code: "LIMIT_REACHED",
+        message: `Conversation limit reached (${maxMessages}/${maxMessages} messages). Please request a callback or contact a specialist.`,
       });
-      if (existingMessages.page.length >= maxMessages) {
-        throw new ConvexError({
-          code: "LIMIT_REACHED",
-          message: `Conversation limit reached (${maxMessages}/${maxMessages} messages). Please request a callback or contact a specialist.`,
-        });
-      }
-    } catch (err) {
-      if (err instanceof ConvexError) throw err;
     }
 
-    // Rate limiting per contact session to prevent runaway loops or denial of service
-    const rateLimit = checkRateLimit(args.contactSessionId, 30, 60000);
-    if (!rateLimit.isAllowed) {
+    const sessionRateLimit = await ctx.runMutation(
+      internal.system.rateLimits.checkKeyedWindow,
+      {
+        key: `session_messages:${args.contactSessionId}`,
+        maxRequests: SESSION_MESSAGE_MAX_REQUESTS,
+        windowMs: SESSION_MESSAGE_WINDOW_MS,
+      },
+    );
+    if (!sessionRateLimit.allowed) {
       throw new ConvexError({
         code: "RATE_LIMITED",
-        message: "You are sending messages too quickly. Please wait a few seconds before trying again.",
+        message:
+          "You are sending messages too quickly. Please wait a few seconds before trying again.",
       });
     }
 
-    // Sanitize user input & screen for prompt injection attempts
-    const sanitizedInput = sanitizeUserInput(args.prompt);
+    // Tenant-level distributed rate limit admission (Free / Pro / Enterprise)
+    const tenantAdmission = await ctx.runMutation(
+      internal.system.rateLimits.checkAndAdmit,
+      {
+        organizationId: conversation.organizationId,
+        estimatedTokens: 600,
+      },
+    );
+    if (!tenantAdmission.allowed) {
+      const quotaExceeded =
+        "reason" in tenantAdmission &&
+        tenantAdmission.reason === "QUOTA_EXHAUSTED";
+      throw new ConvexError({
+        code: quotaExceeded ? "QUOTA_EXHAUSTED" : "RATE_LIMITED",
+        message: quotaExceeded
+          ? "Monthly AI token quota exceeded for your organization's subscription plan. Please upgrade to continue."
+          : "Organization rate limit reached. Please wait a moment before sending more messages.",
+      });
+    }
+
+    if (args.prompt.length > MAX_PROMPT_LENGTH) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Message exceeds the maximum allowed length",
+      });
+    }
+
+    // Multi-stage input moderation
+    const moderation = ModerationPipeline.moderateInput(args.prompt);
+    if (
+      moderation.flagged &&
+      (moderation.riskLevel === "critical" || moderation.riskLevel === "high")
+    ) {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message:
+          "Your message violates safety guidelines and cannot be processed.",
+      });
+    }
 
     // Refresh contact session asynchronously so message creation TTFB is immediate
     await ctx.scheduler.runAfter(0, internal.system.contactSessions.refresh, {
@@ -106,59 +178,58 @@ export const create = action({
       },
     );
 
-    const isDemo = conversation.organizationId.toLowerCase().includes("demo");
-    const isSubscribed = subscription?.status === "active" || isDemo;
+    const isSubscribed =
+      subscription?.status === "active" ||
+      isConfiguredDemoOrganization(conversation.organizationId);
 
     const shouldTriggerAgent =
       conversation.status === "unresolved" && isSubscribed;
 
-    const startTime = Date.now();
-    const cleanPrompt = sanitizedInput.sanitizedText;
+    const cleanPrompt = moderation.sanitizedText;
 
-    // Write the user message and trigger AI, then denormalize the last message preview
+    // Fetch active long-term memories for this customer
+    const customerIdentifier =
+      contactSession.email || String(args.contactSessionId);
+    let promptForAgent = cleanPrompt;
+
     if (shouldTriggerAgent) {
-      const response = await supportAgent.generateText(
-        ctx,
-        { threadId: args.threadId },
-        {
-          prompt: cleanPrompt,
-          tools: {
-            escalateConversationTool: escalateConversation,
-            resolveConversationTool: resolveConversation,
-            searchTool: search,
-          }
-        },
-      );
-
-      // Validate output against system leak guardrails
-      const validated = validateAgentOutput(response.text);
-      const lastText = validated.sanitizedResponse || cleanPrompt;
-
-      const inputTokens = estimateTokens(cleanPrompt);
-      const outputTokens = estimateTokens(validated.sanitizedResponse);
-      const latencyMs = Date.now() - startTime;
-
-      logAIOperation({
-        event: "llm.response",
+      const orchestration = await orchestrateConversationTurn(ctx, {
         organizationId: conversation.organizationId,
         conversationId: conversation._id,
         threadId: args.threadId,
-        model: "gpt-4o-mini",
-        latencyMs,
-        inputTokens,
-        outputTokens,
-        details: {
-          isSuspiciousInput: sanitizedInput.isSuspicious,
-          outputViolations: validated.violations,
-        },
+        contactSessionId: args.contactSessionId,
+        prompt: cleanPrompt,
+        channel: "chat",
       });
 
-      // Update last message with the assistant's response (or prompt if result is empty)
+      const lastText = orchestration.responseMessage;
+      const totalTokensUsed = orchestration.totalTokensUsed;
+
+      // Update last message with the assistant's response for real-time reactive subscription updates
       await ctx.runMutation(internal.system.conversations.updateLastMessage, {
         conversationId: conversation._id,
         lastMessageText: lastText,
-        lastMessageRole: response.text ? "assistant" : "user",
+        lastMessageRole: "assistant",
         lastMessageAt: Date.now(),
+      });
+
+      // Reconcile actual token consumption in distributed rate limiter
+      await ctx.runMutation(internal.system.rateLimits.reconcileTokens, {
+        organizationId: conversation.organizationId,
+        estimatedTokensReserved: 600,
+        actualTokensUsed: totalTokensUsed,
+      });
+
+      // Asynchronously enqueue durable memory extraction job
+      await ctx.runMutation(internal.system.jobs.enqueueJob, {
+        organizationId: conversation.organizationId,
+        jobType: "memory_extraction",
+        payload: JSON.stringify({
+          organizationId: conversation.organizationId,
+          customerIdentifier,
+          conversationId: conversation._id,
+          text: `Customer: ${cleanPrompt}\nAssistant: ${lastText}`,
+        }),
       });
     } else {
       await saveMessage(ctx, components.agent, {
@@ -191,6 +262,17 @@ export const getMany = query({
       throw new ConvexError({
         code: "UNAUTHORIZED",
         message: "Invalid session",
+      });
+    }
+
+    const conversation = await ctx.db
+      .query("conversations")
+      .withIndex("by_thread_id", (q) => q.eq("threadId", args.threadId))
+      .unique();
+    if (!conversation || conversation.contactSessionId !== contactSession._id) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Incorrect session",
       });
     }
 
