@@ -233,7 +233,7 @@ export const tenCapabilities: Capability[] = [
       "Magic byte validation: DOS/PE (MZ), ELF (0x7F 45 4C 46), Mach-O (4 variants), WebAssembly, shebang (#!)",
       "Archive bomb prevention: ZIP, GZIP, 7-Zip, RAR, BZIP2, XZ, TAR (offset 257 magic) all blocked",
       "EICAR antivirus test signature detection on all uploads < 1MB",
-      "Unicode BiDi override attack prevention (‮filename spoofing blocked)",
+      "Unicode BiDi override attack prevention (directional override character spoofing blocked)",
       "Double/intermediate extension rejection: payload.exe.txt, shell.php.pdf all blocked",
       "CSV formula injection defense: =cmd, +HYPERLINK, @DDE, PowerShell payloads rejected",
       "Path traversal prevention: ../ sequences, backslash injection, bare separator chars rejected",
@@ -437,137 +437,271 @@ export const problemSolutionSteps: ProblemSolutionStep[] = [
 
 export interface ArchitectureNode {
   id: string;
-  label: string;
-  icon: string;
-  color: string;
-  techDetail: string;
-  codeRef: string;
+  category: string;
+  title: string;
+  subtitle: string;
+  tech: string;
+  description: string;
+  details: string;
 }
 
 export const architectureNodes: ArchitectureNode[] = [
   {
     id: "widget",
-    label: "Embedded Widget",
-    icon: "💬",
-    color: "gold",
-    techDetail: "Dependency-free IIFE script injected into host pages. Creates iframe + FAB. Accepts ?organizationId= param. Zero npm imports at runtime.",
-    codeRef: "apps/embed/embed.ts",
+    category: "Entrypoint",
+    title: "Embedded Widget",
+    subtitle: "End-User Web Interface",
+    tech: "Vite IIFE + Next.js 15",
+    description: "Lightweight, framework-agnostic client embed script that injects an isolated iframe with Jotai-driven state transitions.",
+    details: "Zero npm runtime dependencies on host page; postMessage iframe bridge with CSP-compliant cross-origin permissions.",
   },
   {
     id: "session",
-    label: "Contact Session",
-    icon: "🔑",
-    color: "blue",
-    techDetail: "24h JWT session created on first contact. Auto-refreshes when <4h remain. Session validated on every public function: expiresAt < Date.now() = UNAUTHORIZED.",
-    codeRef: "public/contactSessions.ts",
+    category: "Authentication",
+    title: "Contact Session",
+    subtitle: "Tenant & Session Verification",
+    tech: "Public Convex Mutations + JWT",
+    description: "Validates tenant scoping, establishes unguessable contactSession IDs, and handles automatic 24-hour token refresh.",
+    details: "Enforces session expiration thresholds and rate-limited admission checks before conversations begin.",
+  },
+  {
+    id: "realtime",
+    category: "Persistence",
+    title: "Real-Time Bus",
+    subtitle: "Convex Reactive Engine",
+    tech: "Convex Realtime Subscriptions",
+    description: "Sub-50ms reactive WebSocket data layer synchronizing conversations simultaneously across customer widgets and operator dashboards.",
+    details: "Serverless mutations mutate relational state with optimistic client-side updates and zero polling.",
   },
   {
     id: "ai-agent",
-    label: "AI Support Agent",
-    icon: "🤖",
-    color: "purple",
-    techDetail: "GPT-4o-mini stateful agent via @convex-dev/agent. Tools: search, escalateConversation, resolveConversation. ModerationPipeline gates all input/output.",
-    codeRef: "system/ai/agents/supportAgent.ts",
+    category: "Intelligence",
+    title: "AI Support Agent",
+    subtitle: "Stateful Agentic Core",
+    tech: "GPT-4o-mini + @convex-dev/agent",
+    description: "Main orchestrator agent capable of autonomous knowledge retrieval, tool evaluation, handoff dispatch, and resolution.",
+    details: "Decoupled system prompt engine with strict conversation state machines: unresolved → escalated → resolved.",
   },
   {
-    id: "rag",
-    label: "Hybrid RAG Engine",
-    icon: "⚡",
-    color: "gold",
-    techDetail: "Dense (text-embedding-3-small, dim=1536) + BM25 (k1=1.2, b=0.75) + RRF fusion. Query router → intent detection → strategy selection → evidence ranking.",
-    codeRef: "system/ai/rag/unifiedSearch.ts",
+    id: "hybrid-rag",
+    category: "Knowledge",
+    title: "Hybrid RAG Engine",
+    subtitle: "Dense + BM25 Reciprocal Rank Fusion",
+    tech: "text-embedding-3-small + In-Process BM25",
+    description: "Multi-tenant vector namespace search merged with lexical BM25 token matching for exact policy identifiers and table figures.",
+    details: "RRF(k=60) candidate fusion with degraded-mode fallback and automated indirect prompt-injection redaction.",
   },
   {
     id: "audit",
-    label: "Audit & Lineage",
-    icon: "🔍",
-    color: "green",
-    techDetail: "aiAuditEvents table (every pipeline stage) + ragLineageRecords (evidence per response). PII masked. Org-scoped. Queryable by traceId or conversationId.",
-    codeRef: "system/audit.ts",
+    category: "Observability",
+    title: "Audit & Lineage Trail",
+    subtitle: "Deterministic Grounding Ledger",
+    tech: "aiAuditEvents + ragLineageRecords",
+    description: "Centralized provenance tracking documenting every retrieval score, source chunk, confidence rating, and tool dispatch.",
+    details: "Immutable audit ledger enabling granular operator drill-downs and empirical precision benchmarks.",
   },
   {
     id: "queue",
-    label: "Priority Queue",
-    icon: "👥",
-    color: "orange",
-    techDetail: "FIFO + priority weights. matchAndAssign() atomically pairs customer + operator. AI-generated handoff summary prevents repeated context. Stale cleanup via heartbeat.",
-    codeRef: "system/queue.ts",
-  },
-  {
-    id: "dashboard",
-    label: "Operator Dashboard",
-    icon: "📊",
-    color: "white",
-    techDetail: "Next.js 15 + Clerk auth. Real-time conversation state via Convex subscriptions. AI response enhancement. Evaluation/LLM-as-a-Judge. File/knowledge management.",
-    codeRef: "apps/web/modules/dashboard/",
+    category: "Escalation",
+    title: "Priority Queue",
+    subtitle: "Human Handoff & Dispatch",
+    tech: "Atomic Convex Matcher + FIFO Weighting",
+    description: "Deterministic handoff engine with automatic AI conversation summarization for zero-repetition human operator transfers.",
+    details: "Atomic reservation prevents double-booking; heartbeat monitors purge orphaned customer slots after 2 minutes.",
   },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INFRASTRUCTURE RAILS
+// INFRASTRUCTURE RAILS (Core System Diagram - Bottom Rails)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface InfraRail {
-  label: string;
-  detail: string;
-  icon: string;
+  title: string;
+  badge: string;
+  desc: string;
 }
 
 export const infrastructureRails: InfraRail[] = [
-  { label: "Multi-Tenant Isolation", detail: "namespace: orgId on all RAG ops. organizationId check on every private query.", icon: "🏢" },
-  { label: "JWT + Clerk Auth", detail: "Dashboard: Clerk JWT. Widget: 24h session tokens. Auto-refresh < 4h.", icon: "🔑" },
-  { label: "AWS Secrets Manager", detail: "Per-tenant API keys at tenant/{orgId}/{service}. Never stored in DB.", icon: "🔐" },
-  { label: "OWASP AI Security", detail: "OWASP LLM02 injection patterns, upload magic byte checks, PII masking.", icon: "🛡️" },
-  { label: "Real-Time Backend", detail: "Convex reactive DB — live query subscriptions, serverless mutations/actions.", icon: "⚡" },
-  { label: "Full AI Observability", detail: "Every AI decision: traceId, latency, tokens, evidence, strategy logged.", icon: "📊" },
+  {
+    title: "Multi-Tenant Data Isolation",
+    badge: "Hard Boundary",
+    desc: "Enforced namespace: orgId on all vector operations; strict tenant verification on every private Convex query.",
+  },
+  {
+    title: "Authentication & Identity",
+    badge: "Clerk + JWT",
+    desc: "Clerk JWT verification for operator dashboard; cryptographically signed session tokens for customer widgets.",
+  },
+  {
+    title: "API Key Vault",
+    badge: "AWS Secrets Manager",
+    desc: "Per-tenant encryption keys and third-party secrets stored securely in AWS Secrets Manager under tenant/{orgId}/.",
+  },
+  {
+    title: "OWASP AI Security",
+    badge: "Multi-Layer Guard",
+    desc: "Defense-in-depth sanitization, 20+ injection signature scans, binary magic byte verification, and formula stripping.",
+  },
+  {
+    title: "Reactive Backend Bus",
+    badge: "Zero Polling",
+    desc: "Serverless TypeScript mutations and automatic client cache invalidation over high-throughput WebSockets.",
+  },
+  {
+    title: "Full-Stack Observability",
+    badge: "Audited Ledger",
+    desc: "Every AI execution generates an audit trail event logging model version, token latency, and exact source citations.",
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ARCHITECTURE LAYERS
+// ARCHITECTURE LAYERS (Architecture Showcase - 5 Layers)
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface ArchitectureLayerItem {
+  title: string;
+  desc: string;
+}
+
 export interface ArchitectureLayer {
-  tier: string;
-  label: string;
-  items: string[];
-  color: string;
+  id: string;
+  layer: number;
+  name: string;
+  badge: string;
+  desc: string;
+  items: ArchitectureLayerItem[];
 }
 
 export const architectureLayers: ArchitectureLayer[] = [
   {
-    tier: "01",
-    label: "Client Layer",
-    items: ["Next.js 15 Dashboard (Clerk auth)", "Vite Widget (session JWT)", "Embed IIFE (zero deps)", "Jotai state atoms"],
-    color: "gold",
+    id: "layer-1",
+    layer: 1,
+    name: "LAYER 01: Client & Presentation Tier",
+    badge: "Zero-Dependency Embed",
+    desc: "Delivers responsive interfaces across all device viewports while strictly guarding host page performance and isolation boundaries.",
+    items: [
+      {
+        title: "Next.js 15 Operator Dashboard",
+        desc: "Server-side rendered operator workstation with Clerk organization gating, real-time message feeds, and RAG lineage inspection.",
+      },
+      {
+        title: "Next.js 15 Chat Widget",
+        desc: "Isolated customer chat experience with Jotai atomic state management, WebRTC voice integration, and session auto-recovery.",
+      },
+      {
+        title: "Standalone Embed Script (IIFE)",
+        desc: "Vanilla TypeScript script bundle (zero npm runtime dependencies) that dynamically injects the iframe bridge and floating launcher.",
+      },
+      {
+        title: "Landing & Portfolio Showcase",
+        desc: "Interactive Vite 5 + React 19 product exploration sandbox providing architectural transparency and live execution simulations.",
+      },
+    ],
   },
   {
-    tier: "02",
-    label: "API & Auth Layer",
-    items: ["Convex public/* (no auth)", "Convex private/* (Clerk JWT)", "Contact session tokens", "Org-scoped access control"],
-    color: "blue",
+    id: "layer-2",
+    layer: 2,
+    name: "LAYER 02: API Gateway & Tenant Security Tier",
+    badge: "Cryptographic Boundary",
+    desc: "Enforces strict access control, tenant isolation, and session authentication before requests reach application business logic.",
+    items: [
+      {
+        title: "Public Convex Function Surface",
+        desc: "Public-facing endpoints for widget clients, guarded by rate limits, input sanitization, and 24-hour contact session tokens.",
+      },
+      {
+        title: "Private Clerk-Authenticated APIs",
+        desc: "Protected management operations verifying organization membership claims and caller identity on every database query.",
+      },
+      {
+        title: "Internal System Dispatcher",
+        desc: "Isolated serverless mutations and actions inaccessible from clients, dedicated to AI scheduling and queue orchestration.",
+      },
+      {
+        title: "HTTP Webhook Receivers",
+        desc: "Svix-verified Clerk subscription billing receivers and Vapi WebRTC call status handlers.",
+      },
+    ],
   },
   {
-    tier: "03",
-    label: "AI & Retrieval Layer",
-    items: ["Hybrid RAG (Dense + BM25 + RRF)", "GPT-4o-mini support agent", "Multimodal document parsing", "Query router + intent detection"],
-    color: "purple",
+    id: "layer-3",
+    layer: 3,
+    name: "LAYER 03: AI Agent & Retrieval Tier",
+    badge: "Agentic State Machine",
+    desc: "Coordinates multi-turn conversational reasoning, dynamic tool dispatch, and precision hybrid knowledge grounding.",
+    items: [
+      {
+        title: "Stateful Support Agent",
+        desc: "GPT-4o-mini agent with persistent thread memory, conversation state machine enforcement, and tool execution boundaries.",
+      },
+      {
+        title: "Hybrid Retrieval Engine (RRF)",
+        desc: "Combines 1536-dim dense vector search with in-process tenant BM25 lexical ranking via Reciprocal Rank Fusion (k=60).",
+      },
+      {
+        title: "Multimodal Document Ingestion",
+        desc: "Vision-powered extraction transforming PDFs, tables, charts, and images into normalized Markdown blocks with SHA-256 deduplication.",
+      },
+      {
+        title: "Query Classification & Routing",
+        desc: "Intent-aware query router directing questions to dense search, lexical search, or hybrid RRF based on identifier characteristics.",
+      },
+    ],
   },
   {
-    tier: "04",
-    label: "Security Layer",
-    items: ["ModerationPipeline (6-stage)", "Upload magic byte validation", "Indirect injection sanitizer", "Tool call authorization"],
-    color: "red",
+    id: "layer-4",
+    layer: 4,
+    name: "LAYER 04: Security & Moderation Pipeline",
+    badge: "Defense-in-Depth",
+    desc: "Protects LLMs, databases, and users against prompt injection, harmful content, malicious uploads, and credential leakage.",
+    items: [
+      {
+        title: "Multi-Stage Moderation Pipeline",
+        desc: "Scans inbound customer queries for toxicity, prompt injection, and jailbreak patterns before model processing.",
+      },
+      {
+        title: "Indirect Prompt Injection Redaction",
+        desc: "Sanitizes retrieved knowledge chunks using 20+ OWASP GenAI patterns, neutralizing hostile instructions embedded in documents.",
+      },
+      {
+        title: "7-Layer Binary Upload Security",
+        desc: "Enforces magic byte validation for DOS/PE, ELF, Mach-O, archive bomb prevention, EICAR antivirus scans, and CSV formula stripping.",
+      },
+      {
+        title: "Output & Credential Leak Guard",
+        desc: "Redacts system instructions, API keys, and sensitive tokens from model outputs before they reach the user.",
+      },
+    ],
   },
   {
-    tier: "05",
-    label: "Data & Audit Layer",
-    items: ["Convex real-time DB", "ragLineageRecords per response", "aiAuditEvents per stage", "AWS Secrets Manager"],
-    color: "green",
+    id: "layer-5",
+    layer: 5,
+    name: "LAYER 05: Data, Queue & Infrastructure Tier",
+    badge: "Deterministic Persistence",
+    desc: "Handles atomic transactional storage, real-time message sync, operator queue matching, and cloud secrets.",
+    items: [
+      {
+        title: "Convex Reactive Database",
+        desc: "ACID-compliant serverless database providing real-time query subscriptions and automatic cache invalidation.",
+      },
+      {
+        title: "Deterministic RAG Lineage Store",
+        desc: "Stores full evidence citations, document identifiers, chunk numbers, and retrieval scores for every AI answer.",
+      },
+      {
+        title: "Atomic FIFO Support Queue",
+        desc: "Priority-weighted customer matching with automated AI handoff summaries and 2-minute stale entry expiration.",
+      },
+      {
+        title: "AWS Secrets Manager Vault",
+        desc: "Encrypted credential storage separating third-party API keys into tenant-specific paths.",
+      },
+    ],
   },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ENGINEERING DECISIONS
+// ENGINEERING DECISIONS (Decisions & Stack Section)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface EngineeringDecision {
@@ -610,7 +744,7 @@ export const engineeringDecisionsCards: EngineeringDecision[] = [
   {
     title: "AI-generated handoff summaries in the queue",
     challenge: "When a conversation escalates, human agents need context immediately — without reading a full transcript.",
-    decision: "On enqueue(), schedule generateSummary() as an async Convex action. GPT-4o-mini summarizes the conversation (untrusted data, sandboxed prompt) into 3-4 bullet points.",
+    decision: "On enqueue(), schedule generateSummary() as an async Convex action. GPT-4o-mini summarizes the conversation into 3-4 bullet points.",
     why: "Zero-explanation handoff means customers never repeat themselves. Operators are ready on pickup.",
     codeRef: "system/queue.ts → generateSummary()",
   },
@@ -618,108 +752,108 @@ export const engineeringDecisionsCards: EngineeringDecision[] = [
     title: "SHA-256 content deduplication for vector index",
     challenge: "Re-uploading the same document should never create duplicate vectors or waste compute.",
     decision: "Hash the normalized document content. If the hash matches an existing entry, skip embedding entirely.",
-    why: "Embedding is expensive. Deduplication keeps the vector index clean and retrieval results free of duplicate chunks.",
+    why: "Embedding is expensive. Deduplication keeps the vector index clean and retrieval results unpolluted by duplicates.",
     codeRef: "system/memory.ts → hashContent() | private/files.ts",
   },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PROOF METRICS
+// PROOF METRICS (Proof & Mindset Section)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface ProofMetric {
+  type: string;
   value: string;
-  unit: string;
   label: string;
-  note: string;
-  icon: string;
+  sub: string;
 }
 
 export const proofMetrics: ProofMetric[] = [
   {
-    value: "94.6",
-    unit: "%",
+    type: "Empirical Benchmark",
+    value: "94.6%",
     label: "RAG Precision@5",
-    note: "Hybrid RRF retrieval evaluated against labeled eval set",
-    icon: "⚡",
+    sub: "Hybrid RRF evaluated against labeled test set with exact policy code recall",
   },
   {
-    value: "7",
-    unit: " layers",
-    label: "Upload Security",
-    note: "Magic bytes → EICAR → archives → extension → content → format → moderation",
-    icon: "🛡️",
+    type: "Architectural Defense",
+    value: "7 Layers",
+    label: "Upload Inspection",
+    sub: "Binary magic bytes, archive bombs, EICAR scan, BiDi overrides, CSV formula stripping",
   },
   {
-    value: "20+",
-    unit: " patterns",
-    label: "Injection Defense",
-    note: "OWASP LLM02 prompt injection patterns screened per message and document",
-    icon: "🔒",
+    type: "OWASP Alignment",
+    value: "20+ Rules",
+    label: "Injection Filters",
+    sub: "OWASP LLM02 signatures screened across inbound inputs and retrieved knowledge chunks",
   },
   {
-    value: "2",
-    unit: " records",
-    label: "Per AI Response",
-    note: "aiAuditEvent + ragLineageRecord written for every conversation turn",
-    icon: "🔍",
+    type: "Deterministic Ledger",
+    value: "2 Records",
+    label: "Per Generation",
+    sub: "aiAuditEvent (execution telemetry) + ragLineageRecord (evidence citations) written per turn",
   },
   {
-    value: "10",
-    unit: " formats",
-    label: "Document Support",
-    note: "PDF, PNG, JPEG, WebP, TXT, CSV, TSV, JSON, MD — all with AI extraction",
-    icon: "📄",
+    type: "Format Coverage",
+    value: "10 Types",
+    label: "Multimodal Parsing",
+    sub: "PDF, PNG, JPEG, WebP, TXT, CSV, TSV, JSON, MD with structured table and chart extraction",
   },
   {
-    value: "40",
-    unit: "%",
-    label: "Response Time Reduction",
-    note: "AI-enhanced operator drafts reduce response time vs unassisted agents",
-    icon: "🎙️",
+    type: "Operational Efficiency",
+    value: "40%",
+    label: "Drafting Speedup",
+    sub: "Reduced human operator drafting time via AI-assisted context summaries and recommendations",
   },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ENGINEER PILLARS (Mindset section)
+// ENGINEER PILLARS (Mindset Section)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface EngineerPillar {
-  icon: string;
+  num: string;
   title: string;
-  body: string;
+  summary: string;
+  detail: string;
 }
 
 export const engineerPillars: EngineerPillar[] = [
   {
-    icon: "🔍",
-    title: "Auditability over magic",
-    body: "Every AI decision is a traceable event. If you can't explain what the AI retrieved and why it said what it said, you can't deploy it in production.",
+    num: "01",
+    title: "Auditability Over Magic",
+    summary: "Every AI decision must be grounded in traceable evidence.",
+    detail: "If an operator cannot inspect the exact chunk, document page, and confidence score behind an AI answer, the system is not production-ready. Aivon logs complete data lineage for every response.",
   },
   {
-    icon: "🛡️",
-    title: "Defense-in-depth, not checkbox security",
-    body: "File uploads check magic bytes, not filenames. Retrieved documents are sanitized before the AI reads them. Tool calls are authorized before execution.",
+    num: "02",
+    title: "Defense-in-Depth Security",
+    summary: "Never trust file extensions, MIME types, or unverified documents.",
+    detail: "We check the first 12 binary bytes of every upload to catch disguised executables. We sanitize retrieved knowledge chunks to prevent indirect prompt injection from hijacking agent instructions.",
   },
   {
-    icon: "⚡",
-    title: "Retrieval quality over retrieval simplicity",
-    body: "Dense vectors miss exact identifiers. BM25 misses semantic meaning. Hybrid RRF + intent routing gets both right. The engineering complexity is worth the precision.",
+    num: "03",
+    title: "Retrieval Quality Over Simplicity",
+    summary: "Pure dense vector search is insufficient for enterprise data.",
+    detail: "Exact policy numbers and table figures disappear in high-dimensional vector space. Combining lexical BM25 with dense vectors via Reciprocal Rank Fusion delivers the precision production needs.",
   },
   {
-    icon: "🏢",
-    title: "Multi-tenancy as architecture, not an afterthought",
-    body: "Org isolation is enforced at the vector namespace level, the database query level, and the API key storage level. There is no path for data to cross tenant boundaries.",
+    num: "04",
+    title: "Structural Multi-Tenancy",
+    summary: "Tenant isolation must be architectural, not a filtering afterthought.",
+    detail: "Vector namespaces are strictly bound to organization IDs. Private queries verify caller identity against database records. Secrets are segmented into isolated AWS vaults.",
   },
   {
-    icon: "👥",
-    title: "AI handoff, not AI replacement",
-    body: "The queue exists because AI shouldn't pretend to handle everything. Escalation is a feature. The handoff summary ensures humans start with context, not questions.",
+    num: "05",
+    title: "Graceful AI Escalation",
+    summary: "AI should recognize its limits and hand off smoothly to humans.",
+    detail: "Automation should not trap customers in infinite loops. Aivon's priority queue atomically matches users with agents while an LLM prepares a 4-bullet handoff summary from the transcript.",
   },
   {
-    icon: "📊",
-    title: "Real systems have real constraints",
-    body: "Subscription gates, session expiry, rate limiting, circuit breakers, stale queue cleanup, idempotency keys — the boring parts are what make production software work.",
+    num: "06",
+    title: "Engineering for Real Constraints",
+    summary: "Production systems succeed on how they handle real-world edge cases.",
+    detail: "Rate limits, circuit breakers, idempotency keys, session expiration, content hash deduplication, and stale queue garbage collection are what keep software stable under scale.",
   },
 ];
 
