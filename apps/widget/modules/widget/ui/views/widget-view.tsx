@@ -1,6 +1,7 @@
 "use client";
 
 import { useAtomValue } from "jotai";
+import { cn } from "@workspace/ui/lib/utils";
 import { WidgetAuthScreen } from "@/modules/widget/ui/screens/widget-auth-screen";
 import { screenAtom } from "@/modules/widget/atoms/widget-atoms";
 import { WidgetErrorScreen } from "@/modules/widget/ui/screens/widget-error-screen";
@@ -30,7 +31,12 @@ export const WidgetView = ({ organizationId }: Props) => {
   }
 
   return (
-    <main className="flex h-full w-full flex-col overflow-hidden rounded-xl border bg-muted">
+    <main
+      className={cn(
+        "flex h-full w-full flex-col overflow-hidden rounded-xl border",
+        screen === "loading" ? "bg-background items-center justify-center" : "bg-muted"
+      )}
+    >
       {screenComponents[screen]}
     </main>
   );
