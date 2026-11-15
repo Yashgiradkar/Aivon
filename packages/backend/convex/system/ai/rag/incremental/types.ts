@@ -90,4 +90,9 @@ export interface IncrementalUpdateResult {
   processingTimeMs: number;
   chunks: StructuredChunk[];
   staleChunksPruned: number;
+  tier?: "small" | "large";
+  embeddingModel?: string;
+  embeddingDimension?: number;
+  targetNamespace?: string;
+  tierReason?: string;
 }

@@ -13,6 +13,7 @@ import type * as http from "../http.js";
 import type * as lib_extractTextContent from "../lib/extractTextContent.js";
 import type * as lib_requestSecurity from "../lib/requestSecurity.js";
 import type * as lib_secrets from "../lib/secrets.js";
+import type * as lib_sessionToken from "../lib/sessionToken.js";
 import type * as lib_uploadSecurity from "../lib/uploadSecurity.js";
 import type * as playground from "../playground.js";
 import type * as private_audit from "../private/audit.js";
@@ -65,6 +66,7 @@ import type * as system_ai_orchestration_registry from "../system/ai/orchestrati
 import type * as system_ai_orchestration_router from "../system/ai/orchestration/router.js";
 import type * as system_ai_orchestration_types from "../system/ai/orchestration/types.js";
 import type * as system_ai_rag from "../system/ai/rag.js";
+import type * as system_ai_rag_adaptiveTiering from "../system/ai/rag/adaptiveTiering.js";
 import type * as system_ai_rag_bm25 from "../system/ai/rag/bm25.js";
 import type * as system_ai_rag_corpus from "../system/ai/rag/corpus.js";
 import type * as system_ai_rag_fusion from "../system/ai/rag/fusion.js";
@@ -133,6 +135,7 @@ declare const fullApi: ApiFromModules<{
   "lib/extractTextContent": typeof lib_extractTextContent;
   "lib/requestSecurity": typeof lib_requestSecurity;
   "lib/secrets": typeof lib_secrets;
+  "lib/sessionToken": typeof lib_sessionToken;
   "lib/uploadSecurity": typeof lib_uploadSecurity;
   playground: typeof playground;
   "private/audit": typeof private_audit;
@@ -185,6 +188,7 @@ declare const fullApi: ApiFromModules<{
   "system/ai/orchestration/router": typeof system_ai_orchestration_router;
   "system/ai/orchestration/types": typeof system_ai_orchestration_types;
   "system/ai/rag": typeof system_ai_rag;
+  "system/ai/rag/adaptiveTiering": typeof system_ai_rag_adaptiveTiering;
   "system/ai/rag/bm25": typeof system_ai_rag_bm25;
   "system/ai/rag/corpus": typeof system_ai_rag_corpus;
   "system/ai/rag/fusion": typeof system_ai_rag_fusion;

@@ -15,7 +15,7 @@ import { useMutation } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 import { Doc } from "@workspace/backend/_generated/dataModel";
 import { useAtomValue, useSetAtom } from "jotai";
-import { contactSessionIdAtomFamily, organizationIdAtom, screenAtom } from "../../atoms/widget-atoms";
+import { contactSessionIdAtomFamily, contactSessionTokenAtomFamily, organizationIdAtom, screenAtom } from "../../atoms/widget-atoms";
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -29,6 +29,9 @@ export const WidgetAuthScreen = () => {
   const setContactSessionId = useSetAtom(
     contactSessionIdAtomFamily(organizationId || "")
   );
+  const setContactSessionToken = useSetAtom(
+    contactSessionTokenAtomFamily(organizationId || "")
+  );
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -39,6 +42,7 @@ export const WidgetAuthScreen = () => {
   });
 
   const createContactSession = useMutation(api.public.contactSessions.create);
+  const issueSignedToken = useMutation(api.public.contactSessions.issueSignedToken);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!organizationId) {
@@ -65,6 +69,15 @@ export const WidgetAuthScreen = () => {
       organizationId,
       metadata,
     });
+
+    try {
+      const tokenResult = await issueSignedToken({ contactSessionId });
+      if (tokenResult?.sessionToken) {
+        setContactSessionToken(tokenResult.sessionToken);
+      }
+    } catch (tokenErr) {
+      console.warn("Session token issue notice:", tokenErr);
+    }
 
     setContactSessionId(contactSessionId);
     setScreen("selection");

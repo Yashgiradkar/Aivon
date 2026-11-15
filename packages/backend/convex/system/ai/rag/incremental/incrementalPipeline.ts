@@ -13,6 +13,11 @@ import { DocumentManifestStore } from "./manifestStore";
 import { DiffEngine } from "./diffEngine";
 import { TenantBM25Cache } from "../bm25";
 import { MultiTenantRetrievalCache, SemanticAnswerKVCache } from "../../cache";
+import {
+  classifyDocumentTier,
+  createAdaptiveEmbeddingProvider,
+  getTieredNamespace,
+} from "../adaptiveTiering";
 
 /**
  * Default production embedding provider utilizing OpenAI text-embedding-3-small.
@@ -61,6 +66,14 @@ export class IncrementalRAGPipeline {
     const pages = PageSplitter.splitDocument(rawText, filename);
     const documentHash = computeContentHash(rawText);
 
+    // 1b. Adaptive Document Tiering: Select optimal embedding model based on volume & terminology
+    const tierResult = classifyDocumentTier({
+      pageCount: pages.length,
+      text: rawText,
+      filename,
+      mimeType: options.mimeType,
+    });
+
     // 2. Fetch previous revision manifest
     const oldManifest = DocumentManifestStore.get(organizationId, documentKey);
 
@@ -101,7 +114,8 @@ export class IncrementalRAGPipeline {
 
     if (missingChunksToEmbed.length > 0 && !options.dryRun) {
       const embeddingProvider: EmbeddingProviderFn =
-        options.embeddingProvider ?? defaultOpenAIEmbeddingProvider;
+        options.embeddingProvider ??
+        createAdaptiveEmbeddingProvider(tierResult.tier);
 
       // Estimate tokens (~4 characters per token for English text)
       tokensConsumed = missingChunksToEmbed.reduce(
@@ -183,6 +197,11 @@ export class IncrementalRAGPipeline {
       processingTimeMs,
       chunks: allChunks,
       staleChunksPruned,
+      tier: tierResult.tier,
+      embeddingModel: tierResult.model,
+      embeddingDimension: tierResult.dimension,
+      targetNamespace: getTieredNamespace(organizationId, tierResult.tier),
+      tierReason: tierResult.reason,
     };
   }
 

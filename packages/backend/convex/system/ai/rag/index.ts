@@ -6,3 +6,4 @@ export * from "./reranker";
 export * from "./structure";
 export * from "./corpus";
 export * from "./incremental";
+export * from "./adaptiveTiering";

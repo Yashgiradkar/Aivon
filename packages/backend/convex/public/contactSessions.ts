@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { mutation } from "../_generated/server";
+import { Id } from "../_generated/dataModel";
 import { SESSION_DURATION_MS } from "../constants";
 import {
   CONTACT_SESSION_CREATE_MAX,
@@ -8,6 +9,10 @@ import {
   isSafeOrganizationId,
   isValidEmail,
 } from "../lib/requestSecurity";
+import {
+  createSignedSessionToken,
+  verifySignedSessionToken,
+} from "../lib/sessionToken";
 
 export const create = mutation({
   args: {
@@ -98,11 +103,73 @@ function metadataIsBounded(
   );
 }
 
-export const validate = mutation({
+export const issueSignedToken = mutation({
   args: {
     contactSessionId: v.id("contactSessions"),
   },
   handler: async (ctx, args) => {
+    const contactSession = await ctx.db.get(args.contactSessionId);
+
+    if (!contactSession || contactSession.expiresAt < Date.now()) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Contact session expired or not found",
+      });
+    }
+
+    const token = await createSignedSessionToken({
+      sessionId: contactSession._id,
+      orgId: contactSession.organizationId,
+      exp: contactSession.expiresAt,
+    });
+
+    return {
+      sessionToken: token,
+      expiresAt: contactSession.expiresAt,
+    };
+  },
+});
+
+export const validate = mutation({
+  args: {
+    contactSessionId: v.optional(v.id("contactSessions")),
+    sessionToken: v.optional(v.string()),
+    organizationId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // 1. If an HMAC-SHA256 signed session token is provided, cryptographically verify it
+    if (args.sessionToken) {
+      const tokenVerification = await verifySignedSessionToken(
+        args.sessionToken,
+        args.organizationId
+      );
+      if (!tokenVerification.valid || !tokenVerification.payload) {
+        return {
+          valid: false,
+          reason:
+            tokenVerification.reason ||
+            "Cryptographic session token verification failed",
+        };
+      }
+
+      const typedSessionId =
+        tokenVerification.payload.sessionId as Id<"contactSessions">;
+      const contactSession = await ctx.db
+        .query("contactSessions")
+        .filter((q) => q.eq(q.field("_id"), typedSessionId))
+        .first();
+      if (!contactSession || contactSession.expiresAt < Date.now()) {
+        return { valid: false, reason: "Contact session expired or not found" };
+      }
+
+      return { valid: true, sessionId: contactSession._id };
+    }
+
+    // 2. Fallback to raw database ID validation for backward compatibility
+    if (!args.contactSessionId) {
+      return { valid: false, reason: "No contact session identifier provided" };
+    }
+
     const contactSession = await ctx.db.get(args.contactSessionId);
 
     if (!contactSession) {

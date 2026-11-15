@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import {
   contactSessionIdAtomFamily,
+  contactSessionTokenAtomFamily,
   errorMessageAtom,
   loadingMessageAtom,
   organizationIdAtom,
@@ -42,6 +43,9 @@ export const WidgetLoadingScreen = ({
 
   const contactSessionId = useAtomValue(
     contactSessionIdAtomFamily(organizationId || "")
+  );
+  const contactSessionToken = useAtomValue(
+    contactSessionTokenAtomFamily(organizationId || "")
   );
 
   // Step 1: Validate organization
@@ -98,7 +102,11 @@ export const WidgetLoadingScreen = ({
 
     setLoadingMessage("Authenticating contact session...");
 
-    validateContactSession({ contactSessionId })
+    validateContactSession({
+      contactSessionId: contactSessionId || undefined,
+      sessionToken: contactSessionToken || undefined,
+      organizationId: organizationId || undefined,
+    })
       .then((result) => {
         setSessionValid(result.valid);
         setStep("settings");
@@ -107,7 +115,14 @@ export const WidgetLoadingScreen = ({
         setSessionValid(false);
         setStep("settings");
       });
-  }, [step, contactSessionId, validateContactSession, setLoadingMessage]);
+  }, [
+    step,
+    contactSessionId,
+    contactSessionToken,
+    organizationId,
+    validateContactSession,
+    setLoadingMessage,
+  ]);
 
   // Step 3: Load Widget Settings
   const widgetSettings = useQuery(

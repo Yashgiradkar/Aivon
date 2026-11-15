@@ -13,7 +13,7 @@ import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar";
 import { cn } from "@workspace/ui/lib/utils";
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
-import { contactSessionIdAtomFamily, conversationIdAtom, hasVapiSecretsAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "../../atoms/widget-atoms";
+import { contactSessionIdAtomFamily, contactSessionTokenAtomFamily, conversationIdAtom, hasVapiSecretsAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "../../atoms/widget-atoms";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 import { Form, FormField } from "@workspace/ui/components/form";
@@ -55,6 +55,9 @@ export const WidgetChatScreen = () => {
   const hasVapiSecrets = useAtomValue(hasVapiSecretsAtom);
   const contactSessionId = useAtomValue(
     contactSessionIdAtomFamily(organizationId || "")
+  );
+  const contactSessionToken = useAtomValue(
+    contactSessionTokenAtomFamily(organizationId || "")
   );
 
   const maxMessages = widgetSettings?.maxMessagesPerConversation ?? 20;
@@ -149,6 +152,7 @@ export const WidgetChatScreen = () => {
         threadId: conversation.threadId,
         prompt: values.message,
         contactSessionId,
+        sessionToken: contactSessionToken || undefined,
       });
     } catch (err: any) {
       console.error("Failed to send message:", err);

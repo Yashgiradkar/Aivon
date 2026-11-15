@@ -6,6 +6,7 @@ import { paginationOptsValidator } from "convex/server";
 import { saveMessage } from "@convex-dev/agent";
 import { ModerationPipeline } from "../system/ai/security";
 import { orchestrateConversationTurn } from "../system/ai/orchestration";
+import { verifySignedSessionToken } from "../lib/sessionToken";
 import {
   isConfiguredDemoOrganization,
   MAX_PROMPT_LENGTH,
@@ -18,8 +19,27 @@ export const create = action({
     prompt: v.string(),
     threadId: v.string(),
     contactSessionId: v.id("contactSessions"),
+    sessionToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Cryptographically verify HMAC-SHA256 session token if provided
+    if (args.sessionToken) {
+      const tokenVerification = await verifySignedSessionToken(args.sessionToken);
+      if (!tokenVerification.valid || !tokenVerification.payload) {
+        throw new ConvexError({
+          code: "UNAUTHORIZED",
+          message:
+            tokenVerification.reason ||
+            "Cryptographic signature verification failed (tampered session token)",
+        });
+      }
+      if (tokenVerification.payload.sessionId !== String(args.contactSessionId)) {
+        throw new ConvexError({
+          code: "UNAUTHORIZED",
+          message: "Session token does not match contact session identity",
+        });
+      }
+    }
     const contactSession = await ctx.runQuery(
       internal.system.contactSessions.getOne,
       {
