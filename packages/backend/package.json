@@ -2,8 +2,8 @@
   "name": "@workspace/backend",
   "type": "module",
   "scripts": {
-    "dev": "convex dev",
-    "setup": "convex dev --until-success"
+    "dev": "convex dev --typecheck try",
+    "setup": "convex dev --until-success --typecheck try"
   },
   "exports": {
     "./convex": "./convex/*.ts"
@@ -22,7 +22,7 @@
   "@convex-dev/rag": "0.3.3",
   "@vapi-ai/server-sdk": "^0.10.0",
   "ai": "^4.3.19",
-  "convex": "1.25.4",
+  "convex": "1.42.3",
   "convex-helpers": "0.1.100",
   "svix": "^1.73.0",
   "zod": "3.25.67"

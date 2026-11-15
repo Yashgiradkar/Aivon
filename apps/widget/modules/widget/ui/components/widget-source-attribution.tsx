@@ -44,7 +44,7 @@ export const WidgetSourceAttribution = ({
         <div className="flex items-center gap-1.5">
           <CheckCircle2Icon className="size-3.5 text-emerald-500" />
           <span className="text-[11px] font-medium text-foreground">
-            Verified Source Attribution ({latestRecord.retrievedEvidence.length})
+            Grounded in your documents ({latestRecord.retrievedEvidence.length})
           </span>
         </div>
         <Button

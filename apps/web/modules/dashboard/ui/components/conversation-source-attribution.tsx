@@ -83,7 +83,7 @@ export const ConversationSourceAttribution = ({ conversationId }: Props) => {
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Deterministic lineage linking AI generated answers to exact knowledge chunks.
+              Don&apos;t wonder where the answer came from. Every PDF, image, table, and text chunk used is on the audit log.
             </p>
           </div>
         </div>

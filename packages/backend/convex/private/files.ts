@@ -203,7 +203,7 @@ export const addFile = action({
         incrementalResult.chunks,
       );
 
-      const result = await rag.add(ctx, {
+      const result = await rag.add(ctx as any, {
         // SUPER IMPORTANT: What search space to add this to. You cannot search across namespaces,
         // If not added, it will be considered global (we do not want this)
         namespace: orgId,

@@ -42,9 +42,11 @@ export const AivonFlagship: React.FC = () => {
             into real-time customer conversations.
           </p>
 
+          <p className="text-[#f2dfbd] text-sm sm:text-base font-semibold leading-relaxed max-w-3xl">
+            Don&apos;t wonder where the answer came from. Audit logs ground every reply in the PDF, image, chart, table, or text it actually used — then the queue hands the hard ones to a person.
+          </p>
           <p className="text-secondary text-sm sm:text-base leading-relaxed max-w-3xl">
-            It combines RAG-powered knowledge retrieval, tool-using AI agents, real-time chat, voice support,
-            human handoff, secure tenant isolation, billing, and an embeddable developer experience into one system.
+            Hybrid RAG, multimodal ingestion, human queue, and OWASP-aligned controls already run in production code. This page walks through those systems, not a mock feature list.
           </p>
         </div>
 
