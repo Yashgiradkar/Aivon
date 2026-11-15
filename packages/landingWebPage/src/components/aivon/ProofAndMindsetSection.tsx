@@ -27,8 +27,7 @@ export const ProofAndMindsetSection: React.FC = () => {
           </h3>
 
           <p className="text-secondary text-sm sm:text-[15px] max-w-3xl leading-relaxed">
-            Distinguishing empirical benchmark evidence from structural system capabilities.
-            No marketing vanity numbers.
+            Benchmarks and structural facts, labeled as such. No vanity numbers.
           </p>
         </div>
 
@@ -73,28 +72,29 @@ export const ProofAndMindsetSection: React.FC = () => {
       {/* ── 2. WHAT THIS SAYS ABOUT HOW I ENGINEER ─────────────── */}
       <div className="space-y-8 pt-10 border-t border-white/[0.08]">
         <div className="space-y-3">
-          <div
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-md"
-            style={{ background: "rgba(79,140,255,0.08)", border: "1px solid var(--accent-border)" }}
-          >
-            <span
-              className="font-mono text-[11px] font-bold uppercase tracking-wider"
-              style={{ color: "var(--accent-soft)" }}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-md"
+              style={{ background: "rgba(79,140,255,0.08)", border: "1px solid var(--accent-border)" }}
             >
-              Engineering Mindset
+              <span
+                className="font-mono text-[11px] font-bold uppercase tracking-wider"
+                style={{ color: "var(--accent-soft)" }}
+              >
+                Engineering Mindset
+              </span>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.04] text-secondary border border-white/10">
+              Verified in Production
             </span>
           </div>
 
           <h3 className="text-white font-black text-2xl sm:text-3xl lg:text-4xl leading-tight">
-            What Aivon says about{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F8CFF] via-[#7FB2FF] to-white">
-              how I engineer.
-            </span>
+            How I engineer.
           </h3>
 
           <p className="text-secondary text-sm sm:text-[15px] max-w-3xl leading-relaxed">
-            Every layer in Aivon reflects how I approach real-world software engineering: prioritizing
-            system cohesion, resilience, security boundaries, and user experience.
+            Cohesion, resilience, security boundaries, and user experience. In every layer.
           </p>
         </div>
 
@@ -157,8 +157,8 @@ export const ProofAndMindsetSection: React.FC = () => {
                 className="mt-4 pt-3 flex items-center justify-between text-[10px] font-mono"
                 style={{ borderTop: "1px solid var(--border-neutral)" }}
               >
-                {/* "Verified in Production" — accent-soft low opacity */}
-                <span style={{ color: "var(--accent-soft)", opacity: 0.5 }}>Verified in Production</span>
+                {/* Micro-label per pillar */}
+                <span style={{ color: "var(--accent-soft)", opacity: 0.6 }}>{pillar.microLabel}</span>
                 {/* ✦ icon — accent-soft low opacity */}
                 <span style={{ color: "var(--accent-soft)", opacity: 0.5 }}>✦</span>
               </div>
@@ -194,13 +194,11 @@ export const ProofAndMindsetSection: React.FC = () => {
           </span>
 
           <blockquote className="text-xl sm:text-2xl md:text-3xl font-black text-white leading-relaxed tracking-tight">
-            &ldquo;Adding AI to an application is easy.
+            &ldquo;Adding AI to an app is easy.
             <br />
             {/* Gradient text from #7FB2FF to #4F8CFF */}
             <span className="text-gradient-blue">
-              Engineering an application that can safely use AI, retrieve the right knowledge, take actions,
-              involve humans, serve multiple organizations, protect customer data, handle real-time communication,
-              and operate as a product —
+              Engineering one that can safely use AI, retrieve the right knowledge, take actions, involve humans, serve many organizations, protect customer data, run in real time, and operate as a product,
             </span>
             <br />
             that&apos;s the engineering problem.&rdquo;
@@ -218,7 +216,7 @@ export const ProofAndMindsetSection: React.FC = () => {
                 Aivon is my answer to that problem.
               </p>
               <p className="text-secondary text-xs font-mono mt-0.5">
-                Full-stack, multi-tenant, real-time AI customer support platform.
+                Full-stack. Multi-tenant. Real-time. AI customer support.
               </p>
             </div>
 

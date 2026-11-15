@@ -22,15 +22,14 @@ export const CoreSystemDiagram: React.FC = () => {
         </div>
 
         <h3 className="text-white font-black text-2xl sm:text-3xl lg:text-4xl leading-tight">
-          How Aivon works:{" "}
+          Message to action.{" "}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F8CFF] via-[#7FB2FF] to-white">
-            from client input to system action.
+            Every hop guarded.
           </span>
         </h3>
 
         <p className="text-secondary text-sm sm:text-[15px] max-w-3xl leading-relaxed">
-          Explore the lifecycle of a conversation. Click on any pipeline node to inspect the engineering decisions,
-          reactive mutations, and security boundaries guarding each step.
+          Click any node to see the decision, the mutation, and the security boundary behind it.
         </p>
       </div>
 
@@ -44,7 +43,7 @@ export const CoreSystemDiagram: React.FC = () => {
             Primary Execution Loop (Click any node)
           </span>
           <span className="text-[11px] font-mono" style={{ color: "var(--accent-primary)" }}>
-            Sub-250ms Target E2E
+            Sub-250ms target, end to end
           </span>
         </div>
 

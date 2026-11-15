@@ -21,13 +21,13 @@ export const CapabilitiesSection: React.FC = () => {
           </span>
         </div>
         <h3 className="text-white font-black text-2xl sm:text-3xl lg:text-4xl leading-tight">
-          Engineered for constraints:{" "}
+          10 pillars.{" "}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F8CFF] via-[#7FB2FF] to-white">
-            10 production pillars.
+            All of them in code.
           </span>
         </h3>
         <p className="text-secondary text-sm sm:text-[15px] max-w-3xl leading-relaxed">
-          Every capability maps to real production code. Click to explore the engineering decisions behind each system layer.
+          Click one to see the decision behind it.
         </p>
       </div>
 

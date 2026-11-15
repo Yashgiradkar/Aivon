@@ -17,18 +17,17 @@ export const WhyStorySection: React.FC = () => {
             className="font-mono text-[11px] font-bold uppercase tracking-wider"
             style={{ color: "var(--accent-soft)" }}
           >
-            The Production Problem Space
+            Production Problem Space
           </span>
         </div>
         <h3 className="text-white font-black text-2xl sm:text-3xl lg:text-4xl leading-tight">
-          Customer support changed.{" "}
+          Support changed.{" "}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F8CFF] via-[#7FB2FF] to-white">
-            The architecture had to change with it.
+            The architecture had to.
           </span>
         </h3>
         <p className="text-secondary text-sm sm:text-[15px] max-w-3xl leading-relaxed">
-          Modern users expect immediate, grounded, conversational answers. But businesses can't afford hallucinations,
-          data leaks, weaponized uploads, or robotic dead ends. Each constraint drove a specific engineering decision in Aivon.
+          Users expect instant, grounded answers. Businesses can't afford hallucinations, data leaks, weaponized uploads, or robotic dead ends. Each constraint shaped a decision.
         </p>
       </div>
 

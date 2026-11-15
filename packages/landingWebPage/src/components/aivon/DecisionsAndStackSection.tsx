@@ -24,13 +24,13 @@ export const DecisionsAndStackSection: React.FC = () => {
             </span>
           </div>
           <h3 className="text-white font-black text-2xl sm:text-3xl lg:text-4xl leading-tight">
-            More than the stack.{" "}
+            Not the stack.{" "}
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F8CFF] via-[#7FB2FF] to-white">
-              The decisions behind it.
+              The decisions.
             </span>
           </h3>
           <p className="text-secondary text-sm sm:text-[15px] max-w-3xl leading-relaxed">
-            Good engineering isn&apos;t about listing frameworks. It&apos;s about evaluating constraints and structuring systems that hold under real-world usage.
+            Good engineering weighs constraints, then builds systems that hold under real use.
           </p>
         </div>
 

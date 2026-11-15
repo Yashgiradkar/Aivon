@@ -30,7 +30,7 @@ export const AivonFlagship: React.FC = () => {
               className="font-mono text-xs font-bold uppercase tracking-[0.18em]"
               style={{ color: "var(--accent-soft)" }}
             >
-              FLAGSHIP PROJECT / AI SYSTEM
+              FLAGSHIP / PRODUCTION AI SYSTEM
             </span>
           </div>
 
@@ -46,23 +46,22 @@ export const AivonFlagship: React.FC = () => {
             AI is easy to demo.{" "}
             <br className="hidden sm:inline" />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F8CFF] via-[#7FB2FF] to-white">
-              Engineering it for the real world is the hard part.
+              Production is the hard part.
             </span>
           </h2>
 
           <p className="text-white text-lg sm:text-xl font-medium leading-relaxed max-w-4xl">
-            <strong>Aivon</strong> is a multi-tenant AI customer support platform built to turn company knowledge
-            into real-time customer conversations.
+            <strong>Aivon</strong> is a multi-tenant AI support platform that turns company knowledge into real-time, auditable customer conversations.
           </p>
 
           <p
             className="text-sm sm:text-base font-semibold leading-relaxed max-w-3xl"
             style={{ color: "var(--accent-soft)" }}
           >
-            Don&apos;t wonder where the answer came from. Audit logs ground every reply in the PDF, image, chart, table, or text it actually used — then the queue hands the hard ones to a person.
+            Every reply is traced to the PDF, table, chart, or image behind it. The hard cases go to a human.
           </p>
           <p className="text-secondary text-sm sm:text-base leading-relaxed max-w-3xl">
-            Hybrid RAG, multimodal ingestion, human queue, and OWASP-aligned controls already run in production code. This page walks through those systems, not a mock feature list.
+            Hybrid RAG, multimodal ingestion, a human queue, and OWASP-aligned controls. Already running in production code.
           </p>
         </div>
 
@@ -113,8 +112,95 @@ export const AivonFlagship: React.FC = () => {
           </div>
         </div>
 
+        {/* ── INVESTOR SNAPSHOT BAND ──────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 pt-2">
+          <div
+            className="p-4 rounded-xl card-toplight space-y-1.5"
+            style={{
+              background: "var(--surface-card)",
+              border: "1px solid var(--border-neutral)",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-secondary">
+                The Problem
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+            </div>
+            <p className="text-white text-xs sm:text-sm font-bold">
+              AI support fails in production.
+            </p>
+            <p className="text-secondary text-[11.5px] leading-relaxed">
+              Hallucinations, data leaks, and dead-end bots.
+            </p>
+          </div>
+
+          <div
+            className="p-4 rounded-xl card-toplight space-y-1.5"
+            style={{
+              background: "var(--surface-card)",
+              border: "1px solid var(--accent-border)",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span
+                className="text-[10px] font-mono font-bold uppercase tracking-wider"
+                style={{ color: "var(--accent-soft)" }}
+              >
+                The Platform
+              </span>
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: "var(--accent-primary)" }}
+              />
+            </div>
+            <p className="text-white text-xs sm:text-sm font-bold">
+              Grounded, multi-tenant, real-time.
+            </p>
+            <p className="text-secondary text-[11.5px] leading-relaxed">
+              Answers from your knowledge, with a human on standby.
+            </p>
+          </div>
+
+          <div
+            className="p-4 rounded-xl card-toplight space-y-1.5"
+            style={{
+              background: "var(--surface-card)",
+              border: "1px solid var(--border-neutral)",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-secondary">
+                The Moat
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            </div>
+            <p className="text-white text-xs sm:text-sm font-bold">
+              Trust built into the architecture.
+            </p>
+            <p className="text-secondary text-[11.5px] leading-relaxed">
+              Audit lineage, defense-in-depth, and tenant isolation, not bolted on.
+            </p>
+          </div>
+        </div>
+
         {/* ── 2. HERO INTERACTION (Simulated Live Environment) ─────── */}
-        <div className="pt-4">
+        <div className="pt-6 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-white font-bold text-lg sm:text-xl tracking-tight">
+              One question. One grounded answer. Full receipts.
+            </h3>
+            <span
+              className="text-[10px] font-mono px-2 py-0.5 rounded"
+              style={{
+                color: "var(--accent-soft)",
+                background: "rgba(79,140,255,0.08)",
+                border: "1px solid var(--accent-border)",
+              }}
+            >
+              Interactive Runtime
+            </span>
+          </div>
           <SimulatedEnvironment />
         </div>
       </div>

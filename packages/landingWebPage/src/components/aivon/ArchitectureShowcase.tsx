@@ -22,15 +22,14 @@ export const ArchitectureShowcase: React.FC = () => {
         </div>
 
         <h3 className="text-white font-black text-2xl sm:text-3xl lg:text-4xl leading-tight">
-          Enterprise architecture:{" "}
+          Five tiers.{" "}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4F8CFF] via-[#7FB2FF] to-white">
-            the 5-tier system blueprint.
+            Each one earns its place.
           </span>
         </h3>
 
         <p className="text-secondary text-sm sm:text-[15px] max-w-3xl leading-relaxed">
-          Production AI systems require decoupling client interfaces from orchestration, real-time data persistence,
-          and external infrastructure rails.
+          Clients, orchestration, real-time persistence, and infrastructure, decoupled on purpose.
         </p>
       </div>
 
@@ -194,8 +193,7 @@ export const ArchitectureShowcase: React.FC = () => {
             &ldquo;Model choice is an architectural concern, not a hardcoded dependency.&rdquo;
           </p>
           <p className="text-secondary text-xs sm:text-[13px] leading-relaxed">
-            The agent runtime decouples prompt templates and tool definitions from provider SDKs. Teams can hot-swap
-            models based on cost, latency, or data governance requirements.
+            Prompts and tools are decoupled from provider SDKs. Swap models for cost, latency, or data governance.
           </p>
         </div>
 
