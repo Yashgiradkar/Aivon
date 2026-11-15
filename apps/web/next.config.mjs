@@ -80,6 +80,9 @@ const nextConfig = {
               "img-src 'self' data: blob: https:",
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self' data:",
+              // Sentry Replay spawns a Web Worker via blob: URL — worker-src must allow it.
+              // Without this directive, 'script-src' is used as fallback and blocks blob: workers.
+              "worker-src blob:",
               `frame-src 'self' ${clerkUrl} https://*.clerk.accounts.dev https://*.accounts.dev https://challenges.cloudflare.com`.replace(/\s+/g, " ").trim(),
               "frame-ancestors 'none'",
               "base-uri 'self'",
