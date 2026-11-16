@@ -1,17 +1,13 @@
-"use client";
-
-import { use } from "react";
-
 import { WidgetView } from "@/modules/widget/ui/views/widget-view";
 
 interface Props {
   searchParams: Promise<{
-    organizationId: string;
-  }>
-};
+    organizationId?: string;
+  }>;
+}
 
-const Page = ({ searchParams }: Props) => {
-  const { organizationId } = use(searchParams);
+const Page = async ({ searchParams }: Props) => {
+  const { organizationId } = await searchParams;
 
   if (
     !organizationId ||
@@ -24,9 +20,7 @@ const Page = ({ searchParams }: Props) => {
     );
   }
 
-  return (
-    <WidgetView organizationId={organizationId} />
-  );
+  return <WidgetView organizationId={organizationId} />;
 };
 
 export default Page;

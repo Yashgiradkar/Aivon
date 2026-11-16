@@ -22,8 +22,11 @@ const nextConfig = {
       : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://*.convex.cloud wss://*.convex.cloud https://*.convex.site https://api.vapi.ai wss://*.vapi.ai; media-src 'self' blob:; frame-ancestors https:; object-src 'none'; base-uri 'self'";
 
     return [
+      // Security headers applied only to app routes — NOT to /_next/static assets.
+      // X-Content-Type-Options: nosniff on /_next/static/css/* causes browsers to
+      // reject CSS served without an explicit Content-Type header (dev server issue).
       {
-        source: "/:path*",
+        source: "/((?!_next/).*)",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -33,10 +36,9 @@ const nextConfig = {
           },
           {
             key: "Strict-Transport-Security",
-            // SEC-09: added preload to HSTS
             value: "max-age=31536000; includeSubDomains; preload",
           },
-          // SEC-10: Widget is embedded in iframes on external pages — allow cross-origin reads
+          // Widget is embedded in iframes on external pages — allow cross-origin reads
           // but restrict opener access to prevent tab-napping
           { key: "Cross-Origin-Opener-Policy", value: "unsafe-none" },
           { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
@@ -46,6 +48,7 @@ const nextConfig = {
           },
         ],
       },
+      // Long-lived immutable cache for hashed static assets
       {
         source: "/_next/static/:path*",
         headers: [
