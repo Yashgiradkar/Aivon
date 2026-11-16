@@ -1,0 +1,9 @@
+diff --git a/src/definePlaygroundAPI.ts b/src/definePlaygroundAPI.ts
+index c6b92a4..c691f16 100644
+--- a/src/definePlaygroundAPI.ts
++++ b/src/definePlaygroundAPI.ts
+@@ -58,3 +58,3 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
+-  async function validateApiKey(ctx: GenericQueryCtx<DataModel>, apiKey: string) {
++  async function validateApiKey(ctx: any, apiKey: string) {
+     await ctx.runQuery(component.apiKeys.validate, { apiKey });
+   }
