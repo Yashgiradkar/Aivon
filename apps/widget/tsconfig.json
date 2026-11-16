@@ -1,10 +1,12 @@
 {
   "extends": "@workspace/typescript-config/nextjs.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "paths": {
       "@/*": [ "./*" ],
       "@workspace/ui/*": [ "../../packages/ui/src/*" ],
-      "@workspace/backend/*": [ "../../packages/backend/convex/*" ]
+      "@workspace/backend/*": [ "../../packages/backend/convex/*" ],
+      "@convex-dev/agent-playground": [ "../../packages/backend/convex/types/agent-playground.d.ts" ]
     },
     "plugins": [
       {

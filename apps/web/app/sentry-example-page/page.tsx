@@ -15,11 +15,10 @@ export default function Page() {
   const [hasSentError, setHasSentError] = useState(false);
   const [isConnected, setIsConnected] = useState(true);
 
-  if (process.env.NODE_ENV === "production") {
-    return null;
-  }
-
   useEffect(() => {
+    if (process.env.NODE_ENV === "production") {
+      return;
+    }
     Sentry.logger.info("Sentry example page loaded");
     async function checkConnectivity() {
       const result = await Sentry.diagnoseSdkConnectivity();
@@ -27,6 +26,10 @@ export default function Page() {
     }
     checkConnectivity();
   }, []);
+
+  if (process.env.NODE_ENV === "production") {
+    return null;
+  }
 
   return (
     <div>

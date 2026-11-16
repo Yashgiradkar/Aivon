@@ -4,6 +4,7 @@
     "baseUrl": ".",
     "paths": {
       "@workspace/backend/*": [ "./convex/*" ],
+      "@convex-dev/agent-playground": [ "./convex/types/agent-playground.d.ts" ]
     },
   },
   "include": [ "." ],
