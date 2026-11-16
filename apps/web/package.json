@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
+    "build:clean": "rm -rf .next && next build",
+    "clean": "rm -rf .next",
     "start": "next start",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
