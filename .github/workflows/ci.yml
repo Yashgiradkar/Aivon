@@ -2,9 +2,9 @@ name: CI & Quality Gates
 
 on:
   push:
-    branches: [main, master, feature/**, staging]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
 
 jobs:
   quality-gates:
