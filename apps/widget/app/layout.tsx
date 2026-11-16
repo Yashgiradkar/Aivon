@@ -1,7 +1,16 @@
 import { Geist, Geist_Mono } from "next/font/google"
+import type { Metadata } from "next";
 
 import "@workspace/ui/globals.css"
 import { Providers } from "@/components/providers"
+
+export const metadata: Metadata = {
+  title: "Aivon Widget",
+  icons: {
+    icon: "/logo.svg",
+    shortcut: "/logo.svg",
+  },
+};
 
 const fontSans = Geist({
   subsets: ["latin"],

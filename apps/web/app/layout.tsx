@@ -9,6 +9,10 @@ import { Toaster } from "@workspace/ui/components/sonner";
 export const metadata: Metadata = {
   title: "Aivon — AI Customer Support Dashboard",
   description: "Manage conversations, AI responses, and customer support queues.",
+  icons: {
+    icon: "/logo.svg",
+    shortcut: "/logo.svg",
+  },
 };
 
 export const viewport: Viewport = {
